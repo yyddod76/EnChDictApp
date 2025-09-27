@@ -1,0 +1,68 @@
+# Miscellaneous
+*.log
+*.swp
+.DS_Store
+
+# IDE and Editor-specific
+.atom/
+.idea/
+.vscode/
+
+# Environment Variables
+.env*
+!.env.example
+
+# Build and generated files
+.dart_tool/
+.flutter-plugins-dependencies
+.flutter-plugins
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# Windows
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# Android
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/key.properties
+*.jks
+
+# iOS
+ios/.generated/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral
+ios/Pods/
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner/Fastfile.snapshot
+ios/Runner/Scheme.xcscheme
+
+# macOS
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Runner/Scheme.xcscheme
+
+# Linux
+linux/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugin_registrant.h
+linux/flutter/generated_plugins.cmake
+
+# Generic ignore for most package-specific generated output
+**/generated_plugin_registrant.dart
+
+# Explicitly ignore any other generated files
+linked_*.ds
+unlinked.ds
+unlinked_spec.ds
+
+# The `pubspec.lock` file is critical for app projects to lock
+# dependency versions for all members of a team. It should NOT be ignored.
+# !pubspec.lock

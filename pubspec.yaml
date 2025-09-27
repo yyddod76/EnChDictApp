@@ -1,0 +1,35 @@
+name: dict_ce_view_demo
+description: "A English-Chinese Dictionary demo"
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_tts: ^4.2.3
+  provider: ^6.1.5
+  path_provider: ^2.0.15
+  path: ^1.8.3
+  sqlite3_flutter_libs: ^0.5.34
+  sqlite3: ^2.7.6
+  http: ^1.4.0
+  flutter_dotenv: ^5.2.1
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.5.3
+  google_mobile_ads: ^5.0.0
+  in_app_purchase: ^3.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.8
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/database/dictionary_ec_database.sqlite
+    - .env
