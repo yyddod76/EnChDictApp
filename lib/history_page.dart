@@ -15,20 +15,39 @@ String switchEnChTitle(String title) {
 
 class HistoryListView extends StatefulWidget {
   final bool pageView;
+  final bool deleteMode;
 
-  HistoryListView({super.key, required this.pageView});
+  HistoryListView({super.key, required this.pageView, required this.deleteMode});
 
   @override
   State<HistoryListView> createState() => _HistoryListViewState();
 }
 
 class _HistoryListViewState extends State<HistoryListView> {
+  final Set<String> firstTwo = {'today', 'this week'};
+  late MyAppState _appState;
+  List<bool> hidden = [true, true, true, true, true];
+
+  @override
+  void dispose() {
+    _appState.setHistHiddenVal(hidden);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
-    var histories = appState.historyList;
-    List<bool> hidden = appState.histHiddenVal.map((e) => e.toLowerCase() == 'true').toList();
+    _appState = appState;
+    var histories = widget.pageView ?
+      appState.historyList :
+      Map.fromEntries(
+        appState.historyList.entries.where(
+          (entry) => firstTwo.contains(entry.key),
+        ),
+      );
+    if (!widget.deleteMode) {
+      hidden = appState.histHiddenVal.map((e) => e.toLowerCase() == 'true').toList();
+    }
 
     return Expanded(
       child:
@@ -54,7 +73,8 @@ class _HistoryListViewState extends State<HistoryListView> {
           for (var key in histories.keys) {
             final words = histories[key]!;
             if (index == runningIndex) {
-              return words.isEmpty ?
+              return 
+              words.isEmpty ?
               SizedBox.shrink() :
               TextButton(
                 style: TextButton.styleFrom(
@@ -63,10 +83,31 @@ class _HistoryListViewState extends State<HistoryListView> {
                   minimumSize: Size(80, 30),
                   padding: EdgeInsets.all(16),
                 ),
-                child: Text(appState.langMode == 0 ? key : switchEnChTitle(key), style: TextStyle(fontSize: getFont(appState, 16), fontWeight: FontWeight.bold),),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(appState.langMode == 0 ? key : switchEnChTitle(key), style: TextStyle(fontSize: getFont(appState, 16), fontWeight: FontWeight.bold),),
+                    if (widget.deleteMode)
+                      IconButton(icon: const Icon(Icons.delete),
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final confirmed = await showDeleteConfirmationDialog(context, appState.langMode == 0 ? "Are you sure" : "确定要", appState.langMode == 0 ? "to clear $key's history items?" : "清理${switchEnChTitle(key)}的历史记录吗？", appState);
+                          if (confirmed) {
+                            appState.clearHistList(key);
+                            if (mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(content: Text(appState.langMode == 0 ? "History items cleared" : "历史记录已清理")),
+                              );
+                            }
+                            setState(() {});
+                          }                          
+                        },
+                      ),
+                  ],
+                ),
                 onPressed: () {
                   setState(() {
-                    appState.setHistHiddenVal(keyIndex, !hidden[keyIndex]);
+                    hidden[keyIndex] = !hidden[keyIndex];
                   });
                 },
               );
@@ -102,14 +143,14 @@ class _HistoryListViewState extends State<HistoryListView> {
               alignment: Alignment.centerLeft,
               padding: EdgeInsets.all(16),
             ),
-            child: Text("...", style: TextStyle(fontSize: getFont(appState, 16), fontWeight: FontWeight.bold),),
+            child: Text(appState.langMode == 0 ? "more..." : "更多...", style: TextStyle(fontSize: getFont(appState, 14), fontWeight: FontWeight.bold),),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => HistoryPage()),
               );
             },
-          ); // last row
+          ); 
         },
       ),
     );
@@ -123,6 +164,7 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
+  bool _deleteMode = false;
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
@@ -134,19 +176,9 @@ class _HistoryPageState extends State<HistoryPage> {
         actions: [
           IconButton(
             onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              final confirmed = await showDeleteConfirmationDialog(context, appState.langMode == 0 ? "Are you sure" : "确定要", appState.langMode == 0 ? "to clear history items?" : "清理所有历史记录吗？", appState);
-              if (confirmed) {
-                appState.clearHistList();
-                if (mounted) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(appState.langMode == 0 ? "All history items cleared." : "所有历史记录已被清理")),
-                  );
-                }
-                setState(() {});
-              }
+              setState(() {_deleteMode = !_deleteMode;});
             },
-            icon: Icon(Icons.auto_delete)
+            icon: _deleteMode ?Icon(Icons.done) : Icon(Icons.auto_delete),
           ),
         ],
       ),
@@ -154,7 +186,7 @@ class _HistoryPageState extends State<HistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            HistoryListView(pageView: true,),
+            HistoryListView(pageView: true, deleteMode: _deleteMode,),
           ],
         ),
       ),

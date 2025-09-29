@@ -238,7 +238,7 @@ class _DetailPageState extends State<DetailPage> {
               ),
               isEn ? (wordData.definition.isEmpty ? SizedBox.shrink() : Column(
                 children: [
-                  SideButtonText(text: wordData.definition.join('\n\n'), alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
+                  SideButtonText(text: wordData.definition.join('\n\n'), strList: wordData.definition, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
                   const SizedBox(height: 16),
                 ],
               )) : Column(
@@ -249,7 +249,7 @@ class _DetailPageState extends State<DetailPage> {
               ),
               isEn ? (wordData.translation.isEmpty ? SizedBox.shrink() : Column(
                 children: [
-                  SideButtonText(text: wordData.translation.join('\n\n'), alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
+                  SideButtonText(text: wordData.translation.join('\n\n'), strList: wordData.translation, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
                   const SizedBox(height: 16),
                 ],
               )) : (wordData.definitions.isEmpty ? SizedBox.shrink() : Column(
@@ -290,7 +290,7 @@ class _DetailPageState extends State<DetailPage> {
                 // mainAxisSize: MainAxisSize.min,
                 children: [
                   TextButton.icon(
-                    label: Text(_showMoreContent ? (appState.langMode == 0 ? "Hide GPT answer" : "隐藏GPT解释") : (_contentLoaded ? (appState.langMode == 0 ? "Show GPT answer" : "展开GPT解释") : (appState.langMode == 0 ? "Try GPT" : "尝试GPT")), style: TextStyle(fontSize: getFont(appState, 14)),),
+                    label: Text(_showMoreContent ? (appState.langMode == 0 ? "Hide AI answer" : "隐藏AI解释") : (_contentLoaded ? (appState.langMode == 0 ? "Show AI answer" : "展开AI解释") : (appState.langMode == 0 ? "Ask AI" : "AI解释")), style: TextStyle(fontSize: getFont(appState, 14)),),
                     icon: Icon(Icons.public),
                     style: TextButton.styleFrom(foregroundColor: Colors.blueGrey,),
                     onPressed: () => {toggleShowMore(word)},
@@ -353,6 +353,7 @@ class SideButtonText extends StatefulWidget {
   final TextStyle? style;
   final CrossAxisAlignment? alignment;
   final String? lang;
+  final List<String>? strList;
 
   SideButtonText({
     super.key,
@@ -360,7 +361,8 @@ class SideButtonText extends StatefulWidget {
     required this.sideButton,
     this.style,
     this.alignment,
-    this.lang
+    this.lang,
+    this.strList
   });
 
   @override
@@ -369,151 +371,180 @@ class SideButtonText extends StatefulWidget {
 
 class _SideButtonTextState extends State<SideButtonText> {
   TextSelection? _selection;
+  bool _collapsed = true;
+  final int hiddenLines = 5;
 
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
+    final String textToShow = widget.strList != null ? 
+        (_collapsed && widget.strList!.length > hiddenLines
+        ? widget.strList!.take(2).toList()
+        : widget.strList)!.join('\n\n') :
+        widget.text;
 
-    return Row(
-      crossAxisAlignment: widget.alignment ?? CrossAxisAlignment.center,
+    return Column(
       children: [
-        Expanded(
-          child: SelectableText(
-            widget.text,
-            style: widget.style,
-            onSelectionChanged: (selection, cause) { // The callback is called when selection changes
-              setState(() {
-                _selection = (selection.isCollapsed) ? null : selection; // Update the state with the new selection
-              });
-            },
-            contextMenuBuilder: (context, selectableTextState) {
-              return AdaptiveTextSelectionToolbar.buttonItems(
-                anchors: selectableTextState.contextMenuAnchors,
-                buttonItems: [
-                  // Custom button
-                  ContextMenuButtonItem(
-                    label: appState.langMode == 0 ? 'Look-up' : '查询',
-                    onPressed: () {
-                      final selectedText = _selection!.textInside(
-                        selectableTextState.textEditingValue.text,
-                      );
-
-                      final trimWord = selectedText
-                          .trim()
-                          .replaceAll(RegExp(r'''['",.;-]'''), "")
-                          .toLowerCase();
-
-                      if (trimWord.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Empty selection!")),
-                        );
-                        return;
-                      }
-
-                      appState.setSearchWord(trimWord);
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(appState.langMode == 0 ? "Searching '$trimWord'" : "查询 '$trimWord'")),
-                      );
-
-                      // final db = Provider.of<DictDatabase>(context, listen: false);
-                      // final isAlpha = RegExp(r'^[a-zA-Z].*$').hasMatch(selectedText);
-
-                      // final results = isAlpha
-                      //     ? db.search(trimWord, 1)
-                      //     : db.searchCh(trimWord, 1, 0);
-
-                      // bool isValid = false;
-
-                      // if (results.isNotEmpty) {
-                      //   final first = results[0];
-
-                      //   if (isAlpha && first is EnWordData) {
-                      //     isValid = first.word.toLowerCase() == trimWord;
-                      //   } else if (!isAlpha && first is ChWordData) {
-                      //     final simp = first.simplified.toLowerCase();
-                      //     final trad = first.traditional.toLowerCase();
-                      //     isValid = (simp == trimWord || trad == trimWord);
-                      //   }
-                      // }
-
-                      // if (!isValid) {
-                      //   ScaffoldMessenger.of(context).showSnackBar(
-                      //     SnackBar(content: Text("Not found: $trimWord")),
-                      //   );
-                      // } else {
-                      //   Navigator.push(
-                      //     context,
-                      //     MaterialPageRoute(
-                      //       builder: (context) => DetailPage(wordData: results[0]),
-                      //     ),
-                      //   );
-                      // }
-                      appState.addHistList(trimWord);
-                    },
-                  ),
-                  ContextMenuButtonItem(
-                    label: 'GPT',
-                    onPressed: () {
-                      final selectedText = _selection!.textInside(
-                        selectableTextState.textEditingValue.text,
-                      );
-                      if (selectedText.isNotEmpty) {
-                        Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DetailPage(wordData: selectedText),
-                          ),
-                        );
-                        appState.addHistList(selectedText);
-                      }
-                    },
-                  ),
-                  ContextMenuButtonItem(
-                    label: 'Google',
-                    onPressed: () async {
-                      final selectedText = _selection!.textInside(
-                        selectableTextState.textEditingValue.text,
-                      );
-                      if (selectedText.isNotEmpty) {
-                        final messenger = ScaffoldMessenger.of(context);
-                        try {
-                          final Uri url = Uri.parse('https://www.google.com/search?q=$selectedText');
-                          if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-                            if (mounted) {
-                              messenger.showSnackBar(
-                                SnackBar(content: Text("Could not launch $url")),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            messenger.showSnackBar(
-                              SnackBar(content: Text("Error: $e")),
+        Row(
+          crossAxisAlignment: widget.alignment ?? CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: SelectableText(
+                textToShow,
+                style: widget.style,
+                onSelectionChanged: (selection, cause) { // The callback is called when selection changes
+                  setState(() {
+                    _selection = (selection.isCollapsed) ? null : selection; // Update the state with the new selection
+                  });
+                },
+                contextMenuBuilder: (context, selectableTextState) {
+                  return AdaptiveTextSelectionToolbar.buttonItems(
+                    anchors: selectableTextState.contextMenuAnchors,
+                    buttonItems: [
+                      // Custom button
+                      ContextMenuButtonItem(
+                        label: appState.langMode == 0 ? 'Look-up' : '查询',
+                        onPressed: () {
+                          final selectedText = _selection!.textInside(
+                            selectableTextState.textEditingValue.text,
+                          );
+        
+                          final trimWord = selectedText
+                              .trim()
+                              .replaceAll(RegExp(r'''['",.;-]'''), "")
+                              .toLowerCase();
+        
+                          if (trimWord.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Empty selection!")),
                             );
+                            return;
                           }
-                          setState(() {});
-                        }
-                        appState.addHistList(selectedText);
-                      }
-                    },
-                  ),
-                  // Default buttons
-                  ...selectableTextState.contextMenuButtonItems,
-                ],
-              );
-            },
+        
+                          appState.setSearchWord(trimWord);
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(appState.langMode == 0 ? "Searching '$trimWord'" : "查询 '$trimWord'")),
+                          );
+        
+                          // final db = Provider.of<DictDatabase>(context, listen: false);
+                          // final isAlpha = RegExp(r'^[a-zA-Z].*$').hasMatch(selectedText);
+        
+                          // final results = isAlpha
+                          //     ? db.search(trimWord, 1)
+                          //     : db.searchCh(trimWord, 1, 0);
+        
+                          // bool isValid = false;
+        
+                          // if (results.isNotEmpty) {
+                          //   final first = results[0];
+        
+                          //   if (isAlpha && first is EnWordData) {
+                          //     isValid = first.word.toLowerCase() == trimWord;
+                          //   } else if (!isAlpha && first is ChWordData) {
+                          //     final simp = first.simplified.toLowerCase();
+                          //     final trad = first.traditional.toLowerCase();
+                          //     isValid = (simp == trimWord || trad == trimWord);
+                          //   }
+                          // }
+        
+                          // if (!isValid) {
+                          //   ScaffoldMessenger.of(context).showSnackBar(
+                          //     SnackBar(content: Text("Not found: $trimWord")),
+                          //   );
+                          // } else {
+                          //   Navigator.push(
+                          //     context,
+                          //     MaterialPageRoute(
+                          //       builder: (context) => DetailPage(wordData: results[0]),
+                          //     ),
+                          //   );
+                          // }
+                          appState.addHistList(trimWord);
+                        },
+                      ),
+                      ContextMenuButtonItem(
+                        label: appState.langMode == 0 ? 'Ask AI' : 'AI解释',
+                        onPressed: () {
+                          final selectedText = _selection!.textInside(
+                            selectableTextState.textEditingValue.text,
+                          );
+                          if (selectedText.isNotEmpty) {
+                            Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DetailPage(wordData: selectedText),
+                              ),
+                            );
+                            appState.addHistList(selectedText);
+                          }
+                        },
+                      ),
+                      ContextMenuButtonItem(
+                        label: 'Google',
+                        onPressed: () async {
+                          final selectedText = _selection!.textInside(
+                            selectableTextState.textEditingValue.text,
+                          );
+                          if (selectedText.isNotEmpty) {
+                            final messenger = ScaffoldMessenger.of(context);
+                            try {
+                              final Uri url = Uri.parse('https://www.google.com/search?q=$selectedText');
+                              if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(content: Text("Could not launch $url")),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text("Error: $e")),
+                                );
+                              }
+                              setState(() {});
+                            }
+                            appState.addHistList(selectedText);
+                          }
+                        },
+                      ),
+                      // Default buttons
+                      ...selectableTextState.contextMenuButtonItems,
+                    ],
+                  );
+                },
+              ),
+            ),
+            widget.sideButton == 0 ?
+            SizedBox.shrink() :
+            IconButton(
+              icon: Icon(Icons.volume_up, color: Colors.blueGrey, size: getFont(appState, 14),),
+              tooltip: "Speak",
+              onPressed: () {
+                appState.trySpeak(widget.lang ?? "en-US", textToShow);
+              },
+            ),
+          ],
+        ),
+
+        if (widget.strList != null && widget.strList!.length > hiddenLines)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: Icon(
+                  _collapsed ? Icons.keyboard_double_arrow_down : Icons.keyboard_double_arrow_up,
+                  size: getFont(appState, 14),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _collapsed = !_collapsed;
+                  });
+                },
+              ),
+            ],
           ),
-        ),
-        widget.sideButton == 0 ?
-        SizedBox.shrink() :
-        IconButton(
-          icon: Icon(Icons.volume_up, color: Colors.blueGrey, size: getFont(appState, 14),),
-          tooltip: "Speak",
-          onPressed: () {
-            appState.trySpeak(widget.lang ?? "en-US", widget.text);
-          },
-        ),
       ],
     );
   }

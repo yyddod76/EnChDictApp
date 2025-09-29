@@ -256,13 +256,31 @@ class DictDatabase {
     _histories['today']!.insert(0, word);
   }
 
-  Future<void> clearHistory() async {
-    _db.execute("""
-        DELETE FROM history;
-      """
-    );
+  Future<void> clearHistory(String key) async {
+    String cmd = "";
+    if (key == 'today') {
+      cmd = """DELETE FROM history
+      WHERE date(dt) = date('now');""";
+    } else if (key == 'this week') {
+      cmd = """DELETE FROM history
+      WHERE date(dt) < date('now') AND date(dt) >= date('now', '-7 day');""";
+    } else if (key == 'this month') {
+      cmd = """DELETE FROM history
+      WHERE date(dt) < date('now', '-7 day') AND date(dt) >= date('now', '-1 month');""";
+    } else if (key == 'this year') {
+      cmd = """DELETE FROM history
+      WHERE date(dt) < date('now', '-1 month') AND date(dt) >= date('now', '-12 month');""";
+    } else if (key == 'older') {
+      cmd = """DELETE FROM history
+      WHERE date(dt) < date('now', '-12 month');""";
+    }
+    if (cmd.isNotEmpty) {
+      _db.execute(cmd);
+    }
     for (var entry in _histories.entries) {
-      entry.value.clear();
+      if (key == entry.key) {
+        entry.value.clear();
+      }
     }
   }
 
@@ -271,13 +289,7 @@ class DictDatabase {
     print('Searching for en word: $word');
     final String pattern = '${word!.toLowerCase()}%';
     final stopwatch = Stopwatch()..start();
-    ResultSet result = _searchEnStmts[pattern[0]]!.select([offset, pattern, limit!]);
-
-    // if (word.contains(' ')) {
-    //   final String pattern2 = '${word.toLowerCase().replaceAll(' ', '-')}%';
-    //   result = _searchEnStmts[pattern[0]]!.select([offset, pattern2, limit]);
-    // }
-
+    final ResultSet result = _searchEnStmts[pattern[0]]!.select([offset, pattern, limit!]);
     stopwatch.stop();
     print('Search completed in ${stopwatch.elapsedMilliseconds} ms, found ${result.length} results.');
 
@@ -300,6 +312,20 @@ class DictDatabase {
   }
 
   List<dynamic> search(String? word, int? limit, {int? offset = 0}) {
+    List<dynamic> results = _search(word, limit, offset: offset);
+
+    if (results.isEmpty && word!.trim() != word) {
+      results = _search(word.trim(), limit, offset: offset);
+    }
+
+    if (results.isEmpty && word!.replaceAll(' ', '-') != word) {
+      results = _search(word.replaceAll(' ', '-'), limit, offset: offset);
+    }
+
+    return results;
+  }
+
+  List<dynamic> _search(String? word, int? limit, {int? offset = 0}) {
     List<dynamic> results = [];
     if (word!.isNotEmpty) {
       final RegExp irregularChars = RegExp(r'[^a-zA-Z -]');

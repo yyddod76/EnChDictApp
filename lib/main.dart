@@ -173,8 +173,10 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
   String get searchWord => _searchWord;
   bool get isHistoryEmpty => !(_histList.entries.any((entry) => entry.value.isNotEmpty));
 
-  void setHistHiddenVal(int idx, bool val) {
-    _histHiddenVal[idx] = val.toString();
+  void setHistHiddenVal(List<bool> vals) {
+    for (int i = 0; i < vals.length; i++) {
+      _histHiddenVal[i] = vals[i].toString();
+    }
     notifyListeners();
   }
 
@@ -218,8 +220,8 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void clearHistList() async {
-    await db.clearHistory();
+  void clearHistList(String key) async {
+    await db.clearHistory(key);
     notifyListeners();
   }
 

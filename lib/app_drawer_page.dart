@@ -15,7 +15,7 @@ class AppDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            HistoryListView(pageView: false,),
+            HistoryListView(pageView: false, deleteMode: false,),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(

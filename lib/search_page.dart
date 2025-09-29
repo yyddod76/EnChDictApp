@@ -64,7 +64,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _loadMore() async {
     setState(() => _isLoading = true);
-    final newItems = db.search(_searchWord, _pageSize, offset: _offset);
+    final List<dynamic> newItems = db.search(_searchWord, _pageSize, offset: _offset);
     if (newItems.length < _pageSize) {
       _hasMore = false;
     }
@@ -85,7 +85,7 @@ class _SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 
-  void _loadBannerAd() {
+  void _loadBannerAd() async {
     final bannerUnitId = dotenv.env['GOOGLE_AD_BANNER_UNIT_ID'];
     _bannerAd = BannerAd(
       adUnitId: bannerUnitId!,
@@ -255,7 +255,7 @@ class _SearchPageState extends State<SearchPage> {
               itemBuilder: (context, index) {
                 return ListTile(
                     dense: true,
-                    title: Text(index == 0 ? (appState.langMode == 0 ? 'Check GPT for "$_searchWord"' : '尝试GPT解释 "$_searchWord"') : (appState.langMode == 0 ? 'Google search "$_searchWord"' : 'Google 查询 "$_searchWord"')),
+                    title: Text(index == 0 ? (appState.langMode == 0 ? 'Ask AI for "$_searchWord"' : 'AI解释 "$_searchWord"') : (appState.langMode == 0 ? 'Google search "$_searchWord"' : 'Google 查询 "$_searchWord"')),
                     leading: Icon(index == 0 ? Icons.public : Icons.search),
                     onTap: index == 0 ?
                     () {
