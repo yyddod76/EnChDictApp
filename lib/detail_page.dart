@@ -25,10 +25,27 @@ class _DetailPageState extends State<DetailPage> {
   bool _contentLoaded = false;
   late MyAppState _appState;
 
+  // [Fix #8-style / Fix #10] _appState set in didChangeDependencies so it is
+  // always available in dispose() even before the first build().
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _appState = context.read<MyAppState>();
+  }
+
+  // [Fix #10] Initial AI fetch moved to initState, not build(),
+  // to prevent repeated concurrent HTTP calls on each rebuild.
+  @override
+  void initState() {
+    super.initState();
+    if (widget.wordData is String) {
+      fetchMoreDetails(widget.wordData as String);
+    }
+  }
+
   Future<void> fetchMoreDetails(String word) async {
-    setState(() {
-      isLoading = true;
-    });
+    if (!mounted) return;
+    setState(() { isLoading = true; });
 
     try {
       final apiKey = dotenv.env['OPENAI_API_KEY'];
@@ -38,6 +55,7 @@ class _DetailPageState extends State<DetailPage> {
 
       const endpoint = 'https://api.openai.com/v1/chat/completions';
 
+      // [Fix #11] Added 15-second timeout to prevent indefinite hang on slow/dead network.
       final response = await http.post(
         Uri.parse(endpoint),
         headers: {
@@ -49,14 +67,16 @@ class _DetailPageState extends State<DetailPage> {
           "messages": [
             {
               "role": "user",
-              "content":
-                  """Explain word '$word' in English and Chinese in dictionary style, separated by ---"""
+              "content": "Explain word '$word' in English and Chinese in dictionary style, separated by ---"
             }
           ],
           "temperature": 0.1
         }),
-      );
+      ).timeout(const Duration(seconds: 15), onTimeout: () {
+        throw Exception('Request timed out');
+      });
 
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -71,15 +91,15 @@ class _DetailPageState extends State<DetailPage> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         onlineContent = 'Error fetching details.';
         _showMoreContent = true;
       });
     }
 
-    setState(() {
-      isLoading = false;
-    });
+    if (!mounted) return;
+    setState(() { isLoading = false; });
   }
 
   void toggleShowMore(String word) {
@@ -94,8 +114,7 @@ class _DetailPageState extends State<DetailPage> {
 
   @override
   void dispose() {
-    _contentLoaded = false;
-    _appState.tryAbortSpeak(); // Stop speaking when widget is disposed
+    _appState.tryAbortSpeak();
     super.dispose();
   }
 
@@ -127,15 +146,10 @@ class _DetailPageState extends State<DetailPage> {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
-    _appState = appState;
     final dynamic wordData = widget.wordData;
     final bool isEn = wordData is EnWordData;
     final bool isNew = wordData is String;
     final String word = isNew ? wordData : (isEn ? wordData.word : wordData.simplified);
-
-    if (isNew && onlineContent == null) {
-      fetchMoreDetails(word);
-    }
 
     return isNew ?
     Scaffold(

@@ -51,7 +51,10 @@ class _HistoryListViewState extends State<HistoryListView> {
         ),
       );
     if (!_initialized) {
-      hidden = appState.histHiddenVal.map((e) => e.toLowerCase() == 'true').toList();
+      // [Fix #15] Validate length before applying to avoid RangeError on
+      // corrupted SharedPreferences data.
+      final loaded = appState.histHiddenVal.map((e) => e.toLowerCase() == 'true').toList();
+      hidden = loaded.length == hidden.length ? loaded : [false, true, true, true, true];
       _initialized = true;
     }
 

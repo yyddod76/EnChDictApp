@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,8 @@ Future<void> main() async {
   const envPath = ".env";
   await dotenv.load(fileName: envPath);
   await MobileAds.instance.initialize();
+  // [Fix #1] Wait for DB to finish async init before the app renders.
+  await DictDatabase.instance.ready;
   runApp(
     Provider<DictDatabase>(
       create: (context) => DictDatabase.instance, // Create the database instance
@@ -68,7 +71,8 @@ class _AppView extends StatelessWidget {
 enum ListTypes {histories, favorites}
 class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
   final DictDatabase db;
-  Timer? _debounceTimer;
+  Timer? _debounceTimer;           // clears _searchWord after delay
+  Timer? _dbSyncTimer;             // [Fix #7] separate timer for DB sync
   late Map<String, List<String>> _histList; // history list
   late List<String> _histHiddenVal;
   List<dynamic> _favList = []; // favorite list
@@ -182,9 +186,16 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
 
   MyAppState(this.db) {
     WidgetsBinding.instance.addObserver(this);
+    // [Fix #6] Pre-initialize late fields with sensible defaults so the UI
+    // never hits LateInitializationError before loadSettings() completes.
+    _modeId = 0;
+    _langId = 0;
+    _fontId = 2;
+    _histHiddenVal = ['false', 'true', 'true', 'true', 'true'];
+    setThemeMode(_modeId);
     initFavList();
     _histList = db.histories;
-    loadSettings();
+    loadSettings(); // async; notifyListeners when done
   }
 
   @override
@@ -198,23 +209,25 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _debounceTimer?.cancel();
+    _dbSyncTimer?.cancel(); // [Fix #7]
     db.refreshFavorites(_favList);
     _tts.stop();
     saveSettings();
     super.dispose();
   }
 
-  void setSearchWord(String? word) {
-    _searchWord = word!.trim();
+  // [Fix #13] Parameters changed to non-nullable String.
+  void setSearchWord(String word) {
+    _searchWord = word.trim();
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-        _searchWord = '';
+      _searchWord = '';
     });
     notifyListeners();
   }
 
-  void addHistList(String? word) async {
-    if (word!.isNotEmpty) {
+  void addHistList(String word) async {
+    if (word.isNotEmpty) {
       await db.updateHistory(word.trim());
       notifyListeners();
     }
@@ -225,9 +238,10 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // [Fix #7] Use dedicated _dbSyncTimer so it doesn't interfere with _debounceTimer.
   void scheduleDbSync(ListTypes listType) {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(seconds: 3), () async {
+    _dbSyncTimer?.cancel();
+    _dbSyncTimer = Timer(const Duration(seconds: 3), () async {
       if (listType == ListTypes.favorites) {
         await db.refreshFavorites(_favList);
       }
@@ -280,17 +294,7 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 }
 
-class HomeButton extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: () {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      },
-      icon: Icon(Icons.restore),
-    );
-  }
-}
+// [Fix #12] Removed unused HomeButton widget.
 
 Future<bool> showDeleteConfirmationDialog(BuildContext context, String title, String content, MyAppState appState) async {
   return await showDialog<bool>(
@@ -342,6 +346,14 @@ class _BuyRemoveAdWidgetState extends State<BuyRemoveAdWidget> {
   ProductDetails? _removeAdsProduct;
   late MyAppState _appState;
 
+  // [Fix #8] _appState set in didChangeDependencies so it is always
+  // initialized before build() and the purchase stream listener run.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _appState = context.read<MyAppState>();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -369,15 +381,13 @@ class _BuyRemoveAdWidgetState extends State<BuyRemoveAdWidget> {
 
   Future<void> _initializeProducts() async {
     final available = await _iap.isAvailable();
-    if (!available) {
-      // Store not available
-      return;
-    }
-    Set<String> productIds = {_removeAdProdID!};
+    // [Fix #9] Check mounted after each await before calling setState.
+    if (!available || !mounted) return;
+    final Set<String> productIds = {_removeAdProdID!};
     final response = await _iap.queryProductDetails(productIds);
+    if (!mounted) return;
     if (response.error != null) {
-      // handle error
-      print("ProductDetails query failed: ${response.error}");
+      debugPrint("ProductDetails query failed: ${response.error}");
     }
     if (response.productDetails.isNotEmpty) {
       setState(() {
@@ -389,17 +399,15 @@ class _BuyRemoveAdWidgetState extends State<BuyRemoveAdWidget> {
   Future<void> _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
     for (var purchaseDetails in purchaseDetailsList) {
       if (purchaseDetails.status == PurchaseStatus.pending) {
-        setState(() => _isPurchasing = true);
+        if (mounted) setState(() => _isPurchasing = true);
       } else if (purchaseDetails.status == PurchaseStatus.purchased || purchaseDetails.status == PurchaseStatus.restored) {
         await _appState.setNoAdsMode(true);
-        setState(() => _isPurchasing = false);
-        // Must complete the purchase
+        if (mounted) setState(() => _isPurchasing = false);
         if (purchaseDetails.pendingCompletePurchase) {
           InAppPurchase.instance.completePurchase(purchaseDetails);
         }
       } else if (purchaseDetails.status == PurchaseStatus.error) {
-        // handle error
-        print("Purchase error: ${purchaseDetails.error}");
+        debugPrint("Purchase error: ${purchaseDetails.error}");
       }
     }
   }
@@ -422,7 +430,6 @@ class _BuyRemoveAdWidgetState extends State<BuyRemoveAdWidget> {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
-    _appState = appState;
     final messenger = ScaffoldMessenger.of(context);
 
     return Card(

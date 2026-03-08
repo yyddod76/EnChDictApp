@@ -24,6 +24,8 @@ class _SearchPageState extends State<SearchPage> {
   final FocusNode _focusNode = FocusNode();
   bool _isSearching = false;
   String _searchWord = '';
+  // [Fix #5] Track last handled external search word to avoid reacting twice.
+  String _lastHandledSearchWord = '';
   bool _isLoading = false;
   bool _hasMore = true;
   int _offset = 0;
@@ -128,16 +130,24 @@ class _SearchPageState extends State<SearchPage> {
     final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
     var appState = context.watch<MyAppState>();
     var favorites = appState.favoriteList;
-    if (appState.searchWord.isNotEmpty) {
-      setState(() {
-        _textController.text = appState.searchWord;
-        _isSearching = true;
-        _offset = 0;
-        filteredItems.clear();
-        _loadMore();
+
+    // [Fix #5] React to external searchWord without calling setState inside build.
+    // addPostFrameCallback defers the setState to after the current frame.
+    if (appState.searchWord.isNotEmpty && appState.searchWord != _lastHandledSearchWord) {
+      _lastHandledSearchWord = appState.searchWord;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _textController.text = _lastHandledSearchWord;
+          setState(() {
+            _isSearching = true;
+            _offset = 0;
+            _hasMore = true;
+            filteredItems.clear();
+          });
+          _loadMore();
+        }
       });
     }
-    // filteredItems = isCurrent ? db.search(_searchWord, _pageSize,) : []; // only search word when page is active
 
     return Scaffold(
       drawer: AppDrawer(),
@@ -231,7 +241,7 @@ class _SearchPageState extends State<SearchPage> {
                   if (_textController.text.isNotEmpty)
                     IconButton(
                       icon: const Icon(Icons.keyboard_hide),
-                      onPressed: () {_hideKeyboard(); print("appState.noAdsMode = ${appState.noAdsMode}");},
+                      onPressed: _hideKeyboard,
                     ),
                 ],
               ),
