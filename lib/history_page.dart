@@ -27,6 +27,7 @@ class _HistoryListViewState extends State<HistoryListView> {
   final Set<String> firstTwo = {'today', 'this week'};
   late MyAppState _appState;
   List<bool> hidden = [true, true, true, true, true];
+  bool _initialized = false;
 
   @override
   void dispose() {
@@ -49,8 +50,9 @@ class _HistoryListViewState extends State<HistoryListView> {
           (entry) => firstTwo.contains(entry.key),
         ),
       );
-    if (!widget.deleteMode) {
+    if (!_initialized) {
       hidden = appState.histHiddenVal.map((e) => e.toLowerCase() == 'true').toList();
+      _initialized = true;
     }
 
     return Expanded(
