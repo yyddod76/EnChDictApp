@@ -30,7 +30,11 @@ class _HistoryListViewState extends State<HistoryListView> {
 
   @override
   void dispose() {
-    _appState.setHistHiddenVal(hidden);
+    final appState = _appState;
+    final hiddenCopy = List<bool>.from(hidden);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      appState.setHistHiddenVal(hiddenCopy);
+    });
     super.dispose();
   }
 
