@@ -119,8 +119,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     return ListTile(
                       visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                       dense: true,
-                      title: Text(item is EnWordData ? item.word : item.simplified, maxLines: 1, style: TextStyle(fontSize: getFont(appState, 14),)),
-                      subtitle: Text(item is EnWordData ? item.translation.join('; ') : item.definitions.join('; '), maxLines: 1, style: TextStyle(fontSize: getFont(appState, 13),)),
+                      title: Text(item is EnWordData ? item.word : item.simplified, maxLines: 1, style: TextStyle(fontSize: getFont(appState, AppFonts.body),)),
+                      subtitle: Text(item is EnWordData ? item.translation.join('; ') : item.definitions.join('; '), maxLines: 1, style: TextStyle(fontSize: getFont(appState, AppFonts.caption),)),
                       leading: editingMode ?
                       Icon(
                           selected.contains(idx) ? Icons.check_box_outlined : Icons.check_box_outline_blank,

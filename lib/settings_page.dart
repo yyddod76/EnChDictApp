@@ -27,7 +27,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(appState.langMode == 0 ? "Display language" : "显示语言", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(appState.langMode == 0 ? "Display language" : "显示语言", style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)),
                   RadioListTile<int>(
                     contentPadding: EdgeInsets.zero,      // remove left/right padding
                     visualDensity: VisualDensity.comfortable, // shrink vertical space
@@ -65,7 +65,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(appState.langMode == 0 ? "Theme" : "主题风格", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(appState.langMode == 0 ? "Theme" : "主题风格", style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   DropdownButton<int>(
                     value: appState.modeId,
@@ -106,10 +106,10 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(appState.langMode == 0 ? "Font Size" : "字体大小", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(appState.langMode == 0 ? "Font Size" : "字体大小", style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)),
                   Row(
                     children: [
-                      const Text("A", style: TextStyle(fontSize: 16)),
+                      Text("A", style: TextStyle(fontSize: getFont(appState, AppFonts.navTitle))),
                       Expanded(
                         child: Slider(
                           value: appState.fontSize,
@@ -122,11 +122,11 @@ class _SettingsPageState extends State<SettingsPage> {
                           },
                         ),
                       ),
-                      const Text("A", style: TextStyle(fontSize: 24)),
+                      Text("A", style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader))),
                     ],
                   ),
                   Text(appState.langMode == 0 ? "Current size: ${appState.fontName()}" : "当前字体：${appState.fontName()}",
-                      style: TextStyle(color: Colors.grey[600])),
+                      style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: Colors.grey[600])),
                 ],
               ),
             ),

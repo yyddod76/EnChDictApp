@@ -109,16 +109,16 @@ class _DetailPageState extends State<DetailPage> {
         children: [
           Row(
             children: [
-              Text(word, style: TextStyle(fontSize: getFont(appState, 20)),),
+              Text(word, style: TextStyle(fontSize: getFont(appState, AppFonts.wordTitle)),),
               SizedBox(width: 36,),
-              Text("by OpenAI", style: TextStyle(fontSize: getFont(appState, 10), color: Colors.blueGrey, fontWeight: FontWeight.normal),),
+              Text("by OpenAI", style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: Colors.blueGrey, fontWeight: FontWeight.normal),),
             ],
           ),
           const SizedBox(height: 8),
           if (contents!.isNotEmpty)
-            SideButtonText(text: contents[0].replaceAll(RegExp(r'[*]'), ""), alignment: CrossAxisAlignment.end, sideButton: 1, lang: isEn ? "en-US" : "zh-CN", style: TextStyle(fontSize: getFont(appState, 14))),
+            SideButtonText(text: contents[0].replaceAll(RegExp(r'[*]'), ""), alignment: CrossAxisAlignment.end, sideButton: 1, lang: isEn ? "en-US" : "zh-CN", style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
           if (contents.length > 1)
-            SideButtonText(text: contents[1].replaceAll(RegExp(r'[*]'), ""), alignment: CrossAxisAlignment.end, sideButton: 1, lang: isEn ? "zh-CN" : "en-US", style: TextStyle(fontSize: getFont(appState, 14))),
+            SideButtonText(text: contents[1].replaceAll(RegExp(r'[*]'), ""), alignment: CrossAxisAlignment.end, sideButton: 1, lang: isEn ? "zh-CN" : "en-US", style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
         ],
       );
     }
@@ -206,7 +206,7 @@ class _DetailPageState extends State<DetailPage> {
               SideButtonText(
                 text: word,
                 sideButton: 1,
-                style: TextStyle(fontSize: getFont(appState, 20), fontWeight: FontWeight.normal),
+                style: TextStyle(fontSize: getFont(appState, AppFonts.wordTitle), fontWeight: FontWeight.normal),
                 lang: isEn ? "en-US" : "zh-CN",
               ),
               const SizedBox(height: 8),
@@ -218,7 +218,7 @@ class _DetailPageState extends State<DetailPage> {
                         SideButtonText(
                           text: "/${wordData.phonetic}/",
                           sideButton: 0,
-                          style: TextStyle(fontSize: getFont(appState, 14), color: Colors.grey, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.body), color: Colors.grey, fontWeight: FontWeight.bold),
                         ),
                       ],
                     )
@@ -228,7 +228,7 @@ class _DetailPageState extends State<DetailPage> {
                         SideButtonText(
                           text: "[${wordData.pinyin}]",
                           sideButton: 0,
-                          style: TextStyle(fontSize: getFont(appState, 14), color: Colors.grey, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.body), color: Colors.grey, fontWeight: FontWeight.bold),
                         )
                       ],
                     )
@@ -238,23 +238,23 @@ class _DetailPageState extends State<DetailPage> {
               ),
               isEn ? (wordData.definition.isEmpty ? SizedBox.shrink() : Column(
                 children: [
-                  SideButtonText(text: wordData.definition.join('\n\n'), strList: wordData.definition, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
+                  SideButtonText(text: wordData.definition.join('\n\n'), strList: wordData.definition, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
                   const SizedBox(height: 16),
                 ],
               )) : Column(
                 children: [
-                  SideButtonText(text: wordData.traditional, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
+                  SideButtonText(text: wordData.traditional, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
                   const SizedBox(height: 16),
                 ],
               ),
               isEn ? (wordData.translation.isEmpty ? SizedBox.shrink() : Column(
                 children: [
-                  SideButtonText(text: wordData.translation.join('\n\n'), strList: wordData.translation, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
+                  SideButtonText(text: wordData.translation.join('\n\n'), strList: wordData.translation, alignment: CrossAxisAlignment.start, sideButton: 0, style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
                   const SizedBox(height: 16),
                 ],
               )) : (wordData.definitions.isEmpty ? SizedBox.shrink() : Column(
                 children: [
-                  SideButtonText(text: wordData.definitions.join('\n\n'), sideButton: 0, style: TextStyle(fontSize: getFont(appState, 14))),
+                  SideButtonText(text: wordData.definitions.join('\n\n'), sideButton: 0, style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
                   const SizedBox(height: 16),
                 ],
               )),
@@ -266,7 +266,7 @@ class _DetailPageState extends State<DetailPage> {
                   children: [
                     Text(
                       "Examples",
-                      style: TextStyle(fontSize: getFont(appState, 14), color: Colors.blueGrey, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: getFont(appState, AppFonts.body), color: Colors.blueGrey, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Column(
@@ -275,7 +275,7 @@ class _DetailPageState extends State<DetailPage> {
                         SideButtonText(
                           text: wordData.examples[i],
                           sideButton: 1,
-                          style: TextStyle(fontSize: getFont(appState, 14))
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.body))
                           // alignment: CrossAxisAlignment.center,
                         ),
                       ],
@@ -290,7 +290,7 @@ class _DetailPageState extends State<DetailPage> {
                 // mainAxisSize: MainAxisSize.min,
                 children: [
                   TextButton.icon(
-                    label: Text(_showMoreContent ? (appState.langMode == 0 ? "Hide AI answer" : "隐藏AI解释") : (_contentLoaded ? (appState.langMode == 0 ? "Show AI answer" : "展开AI解释") : (appState.langMode == 0 ? "Ask AI" : "AI解释")), style: TextStyle(fontSize: getFont(appState, 14)),),
+                    label: Text(_showMoreContent ? (appState.langMode == 0 ? "Hide AI answer" : "隐藏AI解释") : (_contentLoaded ? (appState.langMode == 0 ? "Show AI answer" : "展开AI解释") : (appState.langMode == 0 ? "Ask AI" : "AI解释")), style: TextStyle(fontSize: getFont(appState, AppFonts.body)),),
                     icon: Icon(Icons.public),
                     style: TextButton.styleFrom(foregroundColor: Colors.blueGrey,),
                     onPressed: () => {toggleShowMore(word)},
@@ -300,7 +300,7 @@ class _DetailPageState extends State<DetailPage> {
                   SizedBox.shrink():
                   Expanded(
                     child: TextButton.icon(
-                      label: Text(appState.langMode == 0 ? "Google Search" : "Google 查询", style: TextStyle(fontSize: getFont(appState, 14))),
+                      label: Text(appState.langMode == 0 ? "Google Search" : "Google 查询", style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
                       icon: Icon(Icons.search),
                       style: TextButton.styleFrom(foregroundColor: Colors.blueGrey,),
                       onPressed: () async {
@@ -519,7 +519,7 @@ class _SideButtonTextState extends State<SideButtonText> {
             widget.sideButton == 0 ?
             SizedBox.shrink() :
             IconButton(
-              icon: Icon(Icons.volume_up, color: Colors.blueGrey, size: getFont(appState, 14),),
+              icon: Icon(Icons.volume_up, color: Colors.blueGrey, size: getFont(appState, AppFonts.body),),
               tooltip: "Speak",
               onPressed: () {
                 appState.trySpeak(widget.lang ?? "en-US", textToShow);
@@ -535,7 +535,7 @@ class _SideButtonTextState extends State<SideButtonText> {
               IconButton(
                 icon: Icon(
                   _collapsed ? Icons.keyboard_double_arrow_down : Icons.keyboard_double_arrow_up,
-                  size: getFont(appState, 14),
+                  size: getFont(appState, AppFonts.body),
                 ),
                 onPressed: () {
                   setState(() {

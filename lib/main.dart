@@ -315,6 +315,19 @@ Future<bool> showDeleteConfirmationDialog(BuildContext context, String title, St
 
 double getFont(MyAppState appState, double defaultFont, [double a = 2]) => defaultFont + (appState.fontSize - a) * a;
 
+/// Semantic base font sizes (at normal scale = fontSize 2).
+/// All text in the app should use getFont(appState, AppFonts.xxx).
+class AppFonts {
+  AppFonts._();
+  static const double wordTitle     = 20; // Main word heading in detail page
+  static const double sectionHeader = 18; // Card / section headers
+  static const double navTitle      = 16; // AppBar titles, drawer headers
+  static const double body          = 14; // Primary list/content text
+  static const double caption       = 13; // Secondary / subtitle text
+  static const double label         = 12; // Small labels, icon sizes
+  static const double tiny          = 10; // Micro labels (e.g. "by OpenAI")
+}
+
 class BuyRemoveAdWidget extends StatefulWidget {
   @override
   State<BuyRemoveAdWidget> createState() => _BuyRemoveAdWidgetState();
@@ -434,8 +447,8 @@ class _BuyRemoveAdWidgetState extends State<BuyRemoveAdWidget> {
             tooltip: appState.langMode == 0 ? "Restore Purchases" : "还原已购项目",
           ),
         title: appState.noAdsMode ?
-          Text(appState.langMode == 0 ? "No-Ads mode activated" : "无广告模式已启用", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)) :
-          Text("${appState.langMode == 0 ? "No-Ads mode" : "无广告模式"}${_removeAdsProduct == null ? '' : ' \$${_removeAdsProduct!.price}'}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(appState.langMode == 0 ? "No-Ads mode activated" : "无广告模式已启用", style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)) :
+          Text("${appState.langMode == 0 ? "No-Ads mode" : "无广告模式"}${_removeAdsProduct == null ? '' : ' \$${_removeAdsProduct!.price}'}", style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)),
         value: appState.noAdsMode,
         onChanged: appState.noAdsMode ?
         (value) {

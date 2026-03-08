@@ -92,7 +92,7 @@ class _HistoryListViewState extends State<HistoryListView> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(appState.langMode == 0 ? key : switchEnChTitle(key), style: TextStyle(fontSize: getFont(appState, 16), fontWeight: FontWeight.bold),),
+                    Text(appState.langMode == 0 ? key : switchEnChTitle(key), style: TextStyle(fontSize: getFont(appState, AppFonts.navTitle), fontWeight: FontWeight.bold),),
                     if (widget.deleteMode)
                       IconButton(icon: const Icon(Icons.delete),
                         onPressed: () async {
@@ -126,7 +126,7 @@ class _HistoryListViewState extends State<HistoryListView> {
                 ListTile(
                   dense: true,
                   visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
-                  title: Text(words[i], maxLines: 1, style: TextStyle(fontSize: getFont(appState, 14),),),
+                  title: Text(words[i], maxLines: 1, style: TextStyle(fontSize: getFont(appState, AppFonts.body),),),
                   onTap: () {
                     appState.setSearchWord(words[i]);
                     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -149,7 +149,7 @@ class _HistoryListViewState extends State<HistoryListView> {
               alignment: Alignment.centerLeft,
               padding: EdgeInsets.all(16),
             ),
-            child: Text(appState.langMode == 0 ? "more..." : "更多...", style: TextStyle(fontSize: getFont(appState, 14), fontWeight: FontWeight.bold),),
+            child: Text(appState.langMode == 0 ? "more..." : "更多...", style: TextStyle(fontSize: getFont(appState, AppFonts.body), fontWeight: FontWeight.bold),),
             onPressed: () {
               Navigator.push(
                 context,

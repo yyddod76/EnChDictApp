@@ -22,7 +22,7 @@ class AppDrawer extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   TextButton.icon(
-                    label: Text(appState.langMode == 0 ? "Settings" : "设置", style: TextStyle(fontWeight: FontWeight.bold, fontSize: getFont(appState, 16)),),
+                    label: Text(appState.langMode == 0 ? "Settings" : "设置", style: TextStyle(fontWeight: FontWeight.bold, fontSize: getFont(appState, AppFonts.navTitle)),),
                     onPressed: () {
                       Navigator.push(
                         context,

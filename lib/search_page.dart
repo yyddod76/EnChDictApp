@@ -143,7 +143,7 @@ class _SearchPageState extends State<SearchPage> {
       drawer: AppDrawer(),
       resizeToAvoidBottomInset: true,
       appBar: _isSearching ? null : AppBar(
-        title: const Text('Dictionary 英汉字典', style: TextStyle(fontSize: 18),),
+        title: Text('Dictionary 英汉字典', style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader)),),
         leading: Builder(
           builder: (context) {
             return IconButton(
@@ -299,7 +299,7 @@ class _SearchPageState extends State<SearchPage> {
                       dense: true,
                       visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                       trailing: IconButton(
-                        icon: Icon(favorites.contains(filteredItems[index]) ? Icons.bookmark : Icons.bookmark_border, size: getFont(appState, 14),),
+                        icon: Icon(favorites.contains(filteredItems[index]) ? Icons.bookmark : Icons.bookmark_border, size: getFont(appState, AppFonts.body),),
                         onPressed: () {
                           if (!favorites.contains(filteredItems[index])) {
                             appState.addHistList(mainTitle);
@@ -307,8 +307,8 @@ class _SearchPageState extends State<SearchPage> {
                           appState.toggleFavList(filteredItems[index]);
                         },
                       ),
-                      title: Text(mainTitle, maxLines: 1, style: TextStyle(fontSize: getFont(appState, 14),)),
-                      subtitle: Text(subTitle, maxLines: 1, style: TextStyle(fontSize: getFont(appState, 13),)),
+                      title: Text(mainTitle, maxLines: 1, style: TextStyle(fontSize: getFont(appState, AppFonts.body),)),
+                      subtitle: Text(subTitle, maxLines: 1, style: TextStyle(fontSize: getFont(appState, AppFonts.caption),)),
                       onTap: () {
                         Navigator.push(
                           context,
