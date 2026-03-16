@@ -41,7 +41,7 @@ class AppDrawer extends StatelessWidget {
                 Text(
                   appState.langMode == 0 ? 'English ↔ Chinese' : '英汉互译',
                   style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.75),
+                    color: colorScheme.onPrimaryContainer.withValues(alpha: 0.75),
                   ),
                 ),
               ],

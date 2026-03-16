@@ -5,6 +5,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
+import 'vocab_service.dart';
 
 const List<String> alphabets = [
   "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
@@ -197,6 +198,35 @@ class DictDatabase {
       WHERE date(dt) < date('now', '-12 month')
       ORDER BY datetime(dt) DESC
     """).map((row) => _getStr('word', row)).toList();
+
+    // Create vocab tables
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS vocab_lists (
+        key TEXT PRIMARY KEY, name_en TEXT NOT NULL, name_zh TEXT NOT NULL
+      )
+    ''');
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS vocab_words (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        list_key TEXT NOT NULL, word TEXT NOT NULL, position INTEGER NOT NULL
+      )
+    ''');
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS vocab_registration (
+        list_key TEXT NOT NULL, mode INTEGER NOT NULL DEFAULT 0,
+        registered_at TEXT NOT NULL, current_position INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS vocab_progress (
+        word TEXT NOT NULL, list_key TEXT NOT NULL,
+        interval_days INTEGER NOT NULL DEFAULT 1,
+        repetitions INTEGER NOT NULL DEFAULT 0,
+        next_review_date TEXT NOT NULL,
+        PRIMARY KEY (word, list_key)
+      )
+    ''');
+    await _loadVocabLists();
   }
 
   // [Fix #3] Added ChWordData handling so Chinese bookmarks are persisted.
@@ -329,6 +359,160 @@ class DictDatabase {
       }
     }
     return results;
+  }
+
+  static const Map<String, List<String>> _vocabMeta = {
+    'cet4':     ['College English Test Band 4 (CET-4)', '大学英语4级'],
+    'cet6':     ['College English Test Band 6 (CET-6)', '大学英语6级'],
+    'chuzhong': ['Middle School', '初中'],
+    'gaozhong': ['High School', '高中'],
+    'kaoyan':   ['Postgraduate Entrance', '研究生'],
+    'xiaoxue':  ['Elementary School', '小学'],
+  };
+
+  Future<void> _loadVocabLists() async {
+    for (final entry in _vocabMeta.entries) {
+      final key = entry.key;
+      final nameEn = entry.value[0];
+      final nameZh = entry.value[1];
+      // Insert list meta if not exists
+      final existing = _db.select('SELECT key FROM vocab_lists WHERE key = ?', [key]);
+      if (existing.isEmpty) {
+        final jsonStr = await rootBundle.loadString('assets/vocabulary/$key.json');
+        final List<dynamic> words = json.decode(jsonStr);
+        _db.execute('INSERT INTO vocab_lists (key, name_en, name_zh) VALUES (?, ?, ?)', [key, nameEn, nameZh]);
+        final stmt = _db.prepare('INSERT INTO vocab_words (list_key, word, position) VALUES (?, ?, ?)');
+        for (int i = 0; i < words.length; i++) {
+          stmt.execute([key, words[i] as String, i]);
+        }
+        stmt.dispose();
+        debugPrint('Loaded vocab list: $key (${words.length} words)');
+      }
+    }
+  }
+
+  List<VocabListInfo> getVocabLists() {
+    return _db.select('SELECT v.key, v.name_en, v.name_zh, COUNT(w.id) as cnt FROM vocab_lists v LEFT JOIN vocab_words w ON w.list_key = v.key GROUP BY v.key')
+      .map((row) => VocabListInfo(key: row['key'], nameEn: row['name_en'], nameZh: row['name_zh'], wordCount: row['cnt'] as int))
+      .toList();
+  }
+
+  VocabRegistration? getRegistration() {
+    final rows = _db.select('SELECT r.list_key, r.mode, l.name_en, l.name_zh FROM vocab_registration r JOIN vocab_lists l ON l.key = r.list_key LIMIT 1');
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    return VocabRegistration(listKey: row['list_key'], mode: row['mode'], listNameEn: row['name_en'], listNameZh: row['name_zh']);
+  }
+
+  Future<void> registerVocab(String listKey, int mode) async {
+    _db.execute('DELETE FROM vocab_registration');
+    _db.execute('INSERT INTO vocab_registration (list_key, mode, registered_at, current_position) VALUES (?, ?, date(\'now\'), 0)', [listKey, mode]);
+  }
+
+  Future<void> unregisterVocab() async {
+    _db.execute('DELETE FROM vocab_registration');
+  }
+
+  List<String> getTodayVocabCards(int maxCount) {
+    final reg = getRegistration();
+    if (reg == null) return [];
+
+    // 1. Get words due for review
+    final dueRows = _db.select(
+      'SELECT word FROM vocab_progress WHERE list_key = ? AND next_review_date <= date(\'now\') ORDER BY next_review_date ASC',
+      [reg.listKey],
+    );
+    final List<String> due = dueRows.map((r) => r['word'] as String).toList();
+
+    // 2. Fill up with new words
+    final int newNeeded = (maxCount - due.length).clamp(0, maxCount);
+    List<String> newWords = [];
+    if (newNeeded > 0) {
+      final regRow = _db.select('SELECT current_position, mode FROM vocab_registration LIMIT 1').firstOrNull;
+      if (regRow != null) {
+        final int pos = regRow['current_position'] as int;
+        final int mode = regRow['mode'] as int;
+        if (mode == 0) {
+          // sequential
+          final newRows = _db.select(
+            'SELECT word FROM vocab_words WHERE list_key = ? AND word NOT IN (SELECT word FROM vocab_progress WHERE list_key = ?) AND position >= ? ORDER BY position ASC LIMIT ?',
+            [reg.listKey, reg.listKey, pos, newNeeded],
+          );
+          newWords = newRows.map((r) => r['word'] as String).toList();
+        } else {
+          // random
+          final newRows = _db.select(
+            'SELECT word FROM vocab_words WHERE list_key = ? AND word NOT IN (SELECT word FROM vocab_progress WHERE list_key = ?) ORDER BY RANDOM() LIMIT ?',
+            [reg.listKey, reg.listKey, newNeeded],
+          );
+          newWords = newRows.map((r) => r['word'] as String).toList();
+        }
+      }
+    }
+
+    return [...due, ...newWords].take(maxCount).toList();
+  }
+
+  Future<void> markVocabWordKnown(String word, String listKey) async {
+    final existing = _db.select('SELECT interval_days, repetitions FROM vocab_progress WHERE word = ? AND list_key = ?', [word, listKey]);
+    int intervalDays = 1;
+    int repetitions = 0;
+    if (existing.isNotEmpty) {
+      intervalDays = existing.first['interval_days'] as int;
+      repetitions = existing.first['repetitions'] as int;
+    } else {
+      // First time seeing this word — advance current_position if sequential
+      final regRow = _db.select('SELECT current_position, mode FROM vocab_registration LIMIT 1').firstOrNull;
+      if (regRow != null && (regRow['mode'] as int) == 0) {
+        final wordPos = _db.select('SELECT position FROM vocab_words WHERE list_key = ? AND word = ?', [listKey, word]).firstOrNull;
+        if (wordPos != null) {
+          final newPos = (wordPos['position'] as int) + 1;
+          final currentPos = regRow['current_position'] as int;
+          if (newPos > currentPos) {
+            _db.execute('UPDATE vocab_registration SET current_position = ?', [newPos]);
+          }
+        }
+      }
+    }
+
+    final nextInterval = _ebbinghausNextInterval(repetitions, intervalDays);
+    final nextDate = DateTime.now().add(Duration(days: nextInterval));
+    final nextDateStr = '${nextDate.year}-${nextDate.month.toString().padLeft(2,'0')}-${nextDate.day.toString().padLeft(2,'0')}';
+
+    _db.execute('''
+      INSERT INTO vocab_progress (word, list_key, interval_days, repetitions, next_review_date)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(word, list_key) DO UPDATE SET
+        interval_days = excluded.interval_days,
+        repetitions = excluded.repetitions,
+        next_review_date = excluded.next_review_date
+    ''', [word, listKey, nextInterval, repetitions + 1, nextDateStr]);
+  }
+
+  int _ebbinghausNextInterval(int repetitions, int currentIntervalDays) {
+    if (repetitions == 0) return 1;
+    if (repetitions == 1) return 3;
+    if (repetitions == 2) return 7;
+    if (repetitions == 3) return 14;
+    return (currentIntervalDays * 2.5).round().clamp(30, 365);
+  }
+
+  EnWordData? lookupWord(String word) {
+    final firstChar = word.isNotEmpty ? word[0].toLowerCase() : '';
+    if (!alphabets.contains(firstChar)) return null;
+    final rows = _db.select('SELECT * FROM dict_en_ch_$firstChar WHERE LOWER(word) = ?', [word.toLowerCase()]);
+    if (rows.isEmpty) return null;
+    return EnWordData.fromRow(rows.first);
+  }
+
+  int getVocabTotalWords(String listKey) {
+    final row = _db.select('SELECT COUNT(*) as cnt FROM vocab_words WHERE list_key = ?', [listKey]).firstOrNull;
+    return row?['cnt'] as int? ?? 0;
+  }
+
+  int getVocabLearnedCount(String listKey) {
+    final row = _db.select('SELECT COUNT(*) as cnt FROM vocab_progress WHERE list_key = ?', [listKey]).firstOrNull;
+    return row?['cnt'] as int? ?? 0;
   }
 
   void close() {

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +9,8 @@ import 'main.dart';
 import 'app_drawer_page.dart';
 import 'favorite_page.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'vocab_page.dart';
+import 'vocab_service.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -166,6 +167,16 @@ class _SearchPageState extends State<SearchPage> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.calendar_month_rounded),
+            tooltip: appState.langMode == 0 ? 'Vocabulary Study' : '单词学习',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const VocabPage()),
+              ).then((_) => setState(() {}));
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.bookmark_rounded),
             tooltip: appState.langMode == 0 ? 'Bookmarks' : '收藏',
             onPressed: () {
@@ -257,6 +268,13 @@ class _SearchPageState extends State<SearchPage> {
                 ],
               ),
             ),
+
+            if (!_isSearching && appState.todayVocabCards.isNotEmpty)
+              _VocabCardsSection(
+                cards: appState.todayVocabCards,
+                registration: appState.vocabRegistration,
+                appState: appState,
+              ),
 
             if (!appState.noAdsMode)
               !_isSearching ? SizedBox.shrink() :
@@ -364,3 +382,158 @@ class _SearchPageState extends State<SearchPage> {
   }
 }
 
+class _VocabCardsSection extends StatefulWidget {
+  final List<String> cards;
+  final VocabRegistration? registration;
+  final MyAppState appState;
+  const _VocabCardsSection({required this.cards, required this.registration, required this.appState});
+  @override
+  State<_VocabCardsSection> createState() => _VocabCardsSectionState();
+}
+
+class _VocabCardsSectionState extends State<_VocabCardsSection> {
+  final Set<String> _expandedCards = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = widget.appState;
+    final bool isEn = appState.langMode == 0;
+    final colorScheme = Theme.of(context).colorScheme;
+    final registration = widget.registration;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(
+            children: [
+              Icon(Icons.local_library_rounded, size: getFont(appState, AppFonts.label), color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                registration != null
+                  ? (isEn ? registration.listNameEn : registration.listNameZh)
+                  : (isEn ? 'Today\'s Words' : '今日单词'),
+                style: TextStyle(fontSize: getFont(appState, AppFonts.caption), fontWeight: FontWeight.bold, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: colorScheme.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                child: Text('${widget.cards.length}', style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 120,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            itemCount: widget.cards.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final word = widget.cards[index];
+              final isExpanded = _expandedCards.contains(word);
+              return _VocabFlashCard(
+                word: word,
+                isExpanded: isExpanded,
+                appState: appState,
+                onRefresh: () => setState(() {
+                  if (isExpanded) {
+                    _expandedCards.remove(word);
+                  } else {
+                    _expandedCards.add(word);
+                  }
+                }),
+                onTick: () {
+                  _expandedCards.remove(word);
+                  context.read<MyAppState>().markVocabCardKnown(word);
+                },
+              );
+            },
+          ),
+        ),
+        Divider(height: 1, color: colorScheme.outlineVariant),
+      ],
+    );
+  }
+}
+
+class _VocabFlashCard extends StatelessWidget {
+  final String word;
+  final bool isExpanded;
+  final MyAppState appState;
+  final VoidCallback onRefresh;
+  final VoidCallback onTick;
+
+  const _VocabFlashCard({
+    required this.word,
+    required this.isExpanded,
+    required this.appState,
+    required this.onRefresh,
+    required this.onTick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    EnWordData? data;
+    if (isExpanded) {
+      data = DictDatabase.instance.lookupWord(word);
+    }
+    final translation = data?.translation.take(2).join('; ') ?? '';
+    final phonetic = data?.phonetic ?? '';
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SizedBox(
+        width: 180,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      word,
+                      style: TextStyle(fontSize: getFont(appState, AppFonts.navTitle), fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(Icons.refresh_rounded, size: getFont(appState, AppFonts.navTitle), color: colorScheme.primary),
+                    onPressed: onRefresh,
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(Icons.check_circle_rounded, size: getFont(appState, AppFonts.navTitle), color: colorScheme.tertiary),
+                    onPressed: onTick,
+                  ),
+                ],
+              ),
+              if (isExpanded && phonetic.isNotEmpty)
+                Text(phonetic, style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.secondary), maxLines: 1),
+              const Spacer(),
+              if (isExpanded && translation.isNotEmpty)
+                Text(translation, style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurface), maxLines: 2, overflow: TextOverflow.ellipsis)
+              else if (!isExpanded)
+                Text(
+                  appState.langMode == 0 ? 'Tap ↺ to reveal' : '点击↺查看释义',
+                  style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.outline),
+                  maxLines: 1,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

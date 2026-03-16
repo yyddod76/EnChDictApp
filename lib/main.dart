@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +8,7 @@ import 'search_page.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'vocab_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +17,7 @@ Future<void> main() async {
   await MobileAds.instance.initialize();
   // [Fix #1] Wait for DB to finish async init before the app renders.
   await DictDatabase.instance.ready;
+  await VocabNotificationService.init();
   runApp(
     Provider<DictDatabase>(
       create: (context) => DictDatabase.instance, // Create the database instance
@@ -51,7 +52,7 @@ class _AppView extends StatelessWidget {
       scrolledUnderElevation: 2,
       elevation: 0,
     );
-    const cardTheme = CardTheme(
+    const cardTheme = CardThemeData(
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -170,6 +171,12 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
     return ret;
   }
 
+  // vocab study state
+  List<String> _todayVocabCards = [];
+  List<String> get todayVocabCards => _todayVocabCards;
+  VocabRegistration? _vocabRegistration;
+  VocabRegistration? get vocabRegistration => _vocabRegistration;
+
   //no Ads mode flag
   bool _noAdsMode = false;
   bool get noAdsMode => _noAdsMode;
@@ -223,6 +230,7 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
     initFavList();
     _histList = db.histories;
     loadSettings(); // async; notifyListeners when done
+    refreshVocabCards();
   }
 
   @override
@@ -305,6 +313,19 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
 
   void clearFavList() {
     _favList.clear();
+    notifyListeners();
+  }
+
+  void refreshVocabCards() {
+    _vocabRegistration = db.getRegistration();
+    _todayVocabCards = db.getTodayVocabCards(15);
+    notifyListeners();
+  }
+
+  Future<void> markVocabCardKnown(String word) async {
+    if (_vocabRegistration == null) return;
+    await db.markVocabWordKnown(word, _vocabRegistration!.listKey);
+    _todayVocabCards.remove(word);
     notifyListeners();
   }
 
