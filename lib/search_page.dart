@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -395,11 +396,82 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
   final Set<String> _expandedCards = {};
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.cards.isNotEmpty) {
+      _maybeShowHints();
+    }
+  }
+
+  Future<void> _maybeShowHints() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('vocab_hint_shown') ?? false) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showHintStep(0);
+    });
+  }
+
+  void _showHintStep(int step) {
+    final appState = widget.appState;
+    final isEn = appState.langMode == 0;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final titles = isEn ? ['Tip 1 / 2', 'Tip 2 / 2'] : ['提示 1 / 2', '提示 2 / 2'];
+    final hints = isEn
+        ? [
+            'Tap the  ↺  (refresh) button on a card to reveal its definition.',
+            'Tap the  ✓  (tick) button to confirm you recognise the word.\nThe card will fade away and be scheduled for future review.',
+          ]
+        : [
+            '点击卡片上的  ↺  按钮查看单词释义。',
+            '点击  ✓  按钮确认已记住该单词。\n卡片将渐渐消失，并根据遗忘曲线安排复习。',
+          ];
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          Icon(Icons.lightbulb_rounded, color: colorScheme.primary, size: getFont(appState, AppFonts.sectionHeader)),
+          const SizedBox(width: 8),
+          Text(titles[step], style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader))),
+        ]),
+        content: Text(hints[step], style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
+        actions: [
+          if (step == 0)
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _showHintStep(1);
+              },
+              child: Text(isEn ? 'Next' : '下一步'),
+            )
+          else
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('vocab_hint_shown', true);
+              },
+              child: Text(isEn ? 'OK' : '好的'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final appState = widget.appState;
     final bool isEn = appState.langMode == 0;
     final colorScheme = Theme.of(context).colorScheme;
     final registration = widget.registration;
+
+    const double cardHeight = 130.0;
+    const double spacing = 8.0;
+    final int rows = (widget.cards.length / 2).ceil();
+    final double gridHeight = rows * cardHeight + (rows - 1) * spacing;
+    const double maxHeight = 290.0; // show ~2 rows, scroll if more
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,30 +484,41 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
               const SizedBox(width: 6),
               Text(
                 registration != null
-                  ? (isEn ? registration.listNameEn : registration.listNameZh)
-                  : (isEn ? 'Today\'s Words' : '今日单词'),
+                    ? (isEn ? registration.listNameEn : registration.listNameZh)
+                    : (isEn ? "Today's Words" : '今日单词'),
                 style: TextStyle(fontSize: getFont(appState, AppFonts.caption), fontWeight: FontWeight.bold, color: colorScheme.primary),
               ),
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(color: colorScheme.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                child: Text('${widget.cards.length}', style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '${widget.cards.length}',
+                  style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
         ),
         SizedBox(
-          height: 120,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
+          height: gridHeight.clamp(0.0, maxHeight),
+          child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            physics: gridHeight <= maxHeight
+                ? const NeverScrollableScrollPhysics()
+                : const ClampingScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              mainAxisExtent: cardHeight,
+            ),
             itemCount: widget.cards.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final word = widget.cards[index];
               final isExpanded = _expandedCards.contains(word);
               return _VocabFlashCard(
+                key: ValueKey(word),
                 word: word,
                 isExpanded: isExpanded,
                 appState: appState,
@@ -447,7 +530,7 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
                   }
                 }),
                 onTick: () {
-                  _expandedCards.remove(word);
+                  setState(() => _expandedCards.remove(word));
                   context.read<MyAppState>().markVocabCardKnown(word);
                 },
               );
@@ -460,7 +543,7 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
   }
 }
 
-class _VocabFlashCard extends StatelessWidget {
+class _VocabFlashCard extends StatefulWidget {
   final String word;
   final bool isExpanded;
   final MyAppState appState;
@@ -468,6 +551,7 @@ class _VocabFlashCard extends StatelessWidget {
   final VoidCallback onTick;
 
   const _VocabFlashCard({
+    super.key,
     required this.word,
     required this.isExpanded,
     required this.appState,
@@ -476,60 +560,107 @@ class _VocabFlashCard extends StatelessWidget {
   });
 
   @override
+  State<_VocabFlashCard> createState() => _VocabFlashCardState();
+}
+
+class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+      value: 1.0, // start fully visible
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTick() {
+    _controller.reverse().then((_) {
+      if (mounted) widget.onTick();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    EnWordData? data;
-    if (isExpanded) {
-      data = DictDatabase.instance.lookupWord(word);
-    }
-    final translation = data?.translation.take(2).join('; ') ?? '';
-    final phonetic = data?.phonetic ?? '';
+    final appState = widget.appState;
+    final EnWordData? data = widget.isExpanded ? DictDatabase.instance.lookupWord(widget.word) : null;
+    final String translation = data?.translation.take(2).join('; ') ?? '';
+    final String phonetic = data?.phonetic ?? '';
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: SizedBox(
-        width: 180,
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Opacity(opacity: _controller.value, child: child),
+      child: Card(
+        margin: EdgeInsets.zero,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Row 1: word title (full width)
+              Text(
+                widget.word,
+                style: TextStyle(fontSize: getFont(appState, AppFonts.body), fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              // Phonetic (only when expanded)
+              if (widget.isExpanded && phonetic.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  phonetic,
+                  style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.secondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 4),
+              // Translation area — expands to fill remaining space, clips with ellipsis
+              Expanded(
+                child: widget.isExpanded && translation.isNotEmpty
+                    ? Text(
+                        translation,
+                        style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurface),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              // Bottom row: refresh (left) and tick (right)
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Text(
-                      word,
-                      style: TextStyle(fontSize: getFont(appState, AppFonts.navTitle), fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(
+                      widget.isExpanded ? Icons.visibility_off_rounded : Icons.refresh_rounded,
+                      size: getFont(appState, AppFonts.navTitle),
+                      color: colorScheme.primary,
                     ),
+                    onPressed: widget.onRefresh,
                   ),
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    icon: Icon(Icons.refresh_rounded, size: getFont(appState, AppFonts.navTitle), color: colorScheme.primary),
-                    onPressed: onRefresh,
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: Icon(Icons.check_circle_rounded, size: getFont(appState, AppFonts.navTitle), color: colorScheme.tertiary),
-                    onPressed: onTick,
+                    icon: Icon(
+                      Icons.check_circle_rounded,
+                      size: getFont(appState, AppFonts.navTitle),
+                      color: colorScheme.tertiary,
+                    ),
+                    onPressed: _handleTick,
                   ),
                 ],
               ),
-              if (isExpanded && phonetic.isNotEmpty)
-                Text(phonetic, style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.secondary), maxLines: 1),
-              const Spacer(),
-              if (isExpanded && translation.isNotEmpty)
-                Text(translation, style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurface), maxLines: 2, overflow: TextOverflow.ellipsis)
-              else if (!isExpanded)
-                Text(
-                  appState.langMode == 0 ? 'Tap ↺ to reveal' : '点击↺查看释义',
-                  style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.outline),
-                  maxLines: 1,
-                ),
             ],
           ),
         ),
