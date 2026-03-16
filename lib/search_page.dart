@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
@@ -100,7 +101,7 @@ class _SearchPageState extends State<SearchPage> {
         }),
         onAdFailedToLoad: (ad, err) {
           ad.dispose();
-          print('Failed to load a banner ad: ${err.message}');
+          debugPrint('Failed to load a banner ad: ${err.message}');
         },
       ),
     );
@@ -153,21 +154,20 @@ class _SearchPageState extends State<SearchPage> {
       drawer: AppDrawer(),
       resizeToAvoidBottomInset: true,
       appBar: _isSearching ? null : AppBar(
-        title: Text('Dictionary 英汉字典', style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader)),),
-        leading: Builder(
-          builder: (context) {
-            return IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            );
-          }
+        title: Text(
+          appState.langMode == 0 ? 'Dictionary' : '英汉字典',
+          style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.bookmark),
+            icon: const Icon(Icons.bookmark_rounded),
+            tooltip: appState.langMode == 0 ? 'Bookmarks' : '收藏',
             onPressed: () {
               Navigator.push(
                 context,
@@ -177,38 +177,49 @@ class _SearchPageState extends State<SearchPage> {
           ),
         ],
       ),
-      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       focusNode: _focusNode,
                       controller: _textController,
+                      style: TextStyle(fontSize: getFont(appState, AppFonts.body)),
                       decoration: InputDecoration(
-                        hintText: 'Search...',
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.blueGrey, width: 2.0), // focused
+                        hintText: appState.langMode == 0 ? 'Search words...' : '查询单词...',
+                        hintStyle: TextStyle(fontSize: getFont(appState, AppFonts.body)),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(28),
+                          borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey, width: 1.0), // unfocused
+                          borderRadius: BorderRadius.circular(28),
+                          borderSide: BorderSide.none,
                         ),
-                        isDense: true, // tighter spacing
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(28),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2.0,
+                          ),
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
                         prefixIcon: _isSearching
                             ? IconButton(
-                                icon: const BackButtonIcon(),
-                                onPressed: () {
-                                  _exitSearch(appState);
-                                },
-                              ) :
-                            Icon(Icons.search),
+                                icon: const Icon(Icons.arrow_back_rounded),
+                                onPressed: () => _exitSearch(appState),
+                              )
+                            : const Icon(Icons.search_rounded),
                         suffixIcon: _isSearching
                             ? IconButton(
-                                icon: const Icon(Icons.clear),
+                                icon: const Icon(Icons.close_rounded),
                                 onPressed: () {
                                   _textController.clear();
                                   setState(() {
@@ -231,7 +242,7 @@ class _SearchPageState extends State<SearchPage> {
                           _offset = 0;
                           _hasMore = true;
                           _loadMore();
-                        }); // Refresh UI
+                        });
                         _debounceTimer = Timer(const Duration(seconds: 10), () {
                           appState.addHistList(_searchWord);
                         });
@@ -240,7 +251,7 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                   if (_textController.text.isNotEmpty)
                     IconButton(
-                      icon: const Icon(Icons.keyboard_hide),
+                      icon: const Icon(Icons.keyboard_hide_rounded),
                       onPressed: _hideKeyboard,
                     ),
                 ],
@@ -265,8 +276,14 @@ class _SearchPageState extends State<SearchPage> {
               itemBuilder: (context, index) {
                 return ListTile(
                     dense: true,
-                    title: Text(index == 0 ? (appState.langMode == 0 ? 'Ask AI for "$_searchWord"' : 'AI解释 "$_searchWord"') : (appState.langMode == 0 ? 'Google search "$_searchWord"' : 'Google 查询 "$_searchWord"')),
-                    leading: Icon(index == 0 ? Icons.public : Icons.search),
+                    title: Text(
+                      index == 0 ? (appState.langMode == 0 ? 'Ask AI for "$_searchWord"' : 'AI解释 "$_searchWord"') : (appState.langMode == 0 ? 'Google search "$_searchWord"' : 'Google 查询 "$_searchWord"'),
+                      style: TextStyle(fontSize: getFont(appState, AppFonts.body)),
+                    ),
+                    leading: Icon(
+                      index == 0 ? Icons.auto_awesome_rounded : Icons.travel_explore_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     onTap: index == 0 ?
                     () {
                       Navigator.push(
@@ -309,7 +326,11 @@ class _SearchPageState extends State<SearchPage> {
                       dense: true,
                       visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                       trailing: IconButton(
-                        icon: Icon(favorites.contains(filteredItems[index]) ? Icons.bookmark : Icons.bookmark_border, size: getFont(appState, AppFonts.body),),
+                        icon: Icon(
+                          favorites.contains(filteredItems[index]) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                          size: getFont(appState, AppFonts.body),
+                          color: favorites.contains(filteredItems[index]) ? Theme.of(context).colorScheme.primary : null,
+                        ),
                         onPressed: () {
                           if (!favorites.contains(filteredItems[index])) {
                             appState.addHistList(mainTitle);

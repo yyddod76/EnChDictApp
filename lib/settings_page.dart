@@ -67,29 +67,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(appState.langMode == 0 ? "Theme" : "主题风格", style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  DropdownButton<int>(
-                    value: appState.modeId,
-                    items: [
-                      DropdownMenuItem(
-                        value: 0,
-                        child: Text(appState.langMode == 0 ? "Auto" : "自动"),
-                      ),
-                      DropdownMenuItem(
-                        value: 1,
-                        child: Text(appState.langMode == 0 ? "Light" : "白天背景"),
-                      ),
-                      DropdownMenuItem(
-                        value: 2,
-                        child: Text(appState.langMode == 0 ? "Dark" : "夜晚背景"),
-                      ),
-                      DropdownMenuItem(
-                        value: 3,
-                        child: Text(appState.langMode == 0 ? "Follow System" : "跟随系统"),
-                      ),
-                    ],
-                    onChanged: (value) {
-                        setState(() => appState.setThemeMode(value!));
+                  DropdownMenu<int>(
+                    initialSelection: appState.modeId,
+                    onSelected: (value) {
+                      if (value != null) setState(() => appState.setThemeMode(value));
                     },
+                    dropdownMenuEntries: [
+                      DropdownMenuEntry(value: 0, label: appState.langMode == 0 ? "Auto" : "自动"),
+                      DropdownMenuEntry(value: 1, label: appState.langMode == 0 ? "Light" : "白天背景"),
+                      DropdownMenuEntry(value: 2, label: appState.langMode == 0 ? "Dark" : "夜晚背景"),
+                      DropdownMenuEntry(value: 3, label: appState.langMode == 0 ? "Follow System" : "跟随系统"),
+                    ],
                   ),
                 ],
               ),

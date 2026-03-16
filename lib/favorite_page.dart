@@ -97,7 +97,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       leading: editingMode ?
                       Icon(
                           selectedAll ? Icons.check_box_outlined : Icons.check_box_outline_blank,
-                          size: 16,
+                          size: getFont(appState, AppFonts.navTitle),
                         ) : null,
                       onTap: () {
                         setState(() {
@@ -124,7 +124,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       leading: editingMode ?
                       Icon(
                           selected.contains(idx) ? Icons.check_box_outlined : Icons.check_box_outline_blank,
-                          size: 16,
+                          size: getFont(appState, AppFonts.navTitle),
                         ) : null,
                       onTap: () {
                         if (editingMode) {

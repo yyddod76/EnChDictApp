@@ -46,21 +46,48 @@ class _AppView extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<MyAppState>();
 
+    const appBarTheme = AppBarTheme(
+      centerTitle: false,
+      scrolledUnderElevation: 2,
+      elevation: 0,
+    );
+    const cardTheme = CardTheme(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+      ),
+    );
+    const listTileTheme = ListTileThemeData(
+      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+    );
+    const snackBarTheme = SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
+    );
+
     return MaterialApp(
       title: 'Dictionary App',
       theme: ThemeData(
         brightness: Brightness.light,
-        // primarySwatch:Colors.blueGrey,
         platform: TargetPlatform.android,
         colorSchemeSeed: Colors.blueGrey,
         useMaterial3: true,
+        appBarTheme: appBarTheme,
+        cardTheme: cardTheme,
+        listTileTheme: listTileTheme,
+        snackBarTheme: snackBarTheme,
       ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
-        // primarySwatch:Colors.blueGrey,
         platform: TargetPlatform.android,
         colorSchemeSeed: Colors.blueGrey,
         useMaterial3: true,
+        appBarTheme: appBarTheme,
+        cardTheme: cardTheme,
+        listTileTheme: listTileTheme,
+        snackBarTheme: snackBarTheme,
       ),
       themeMode: appState.themeMode,
       home: SearchPage(),

@@ -155,7 +155,13 @@ class _DetailPageState extends State<DetailPage> {
     Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        leading: BackButton(),
+        leading: const BackButton(),
+        title: Text(
+          word,
+          style: TextStyle(fontSize: getFont(appState, AppFonts.navTitle)),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -164,30 +170,29 @@ class _DetailPageState extends State<DetailPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isLoading) const CircularProgressIndicator(),
-                if (!isLoading) TextButton.icon(
-                  label: Text(appState.langMode == 0 ? "Google Search" : "Google 查询"),
-                  icon: Icon(Icons.search),
+                if (isLoading) const Center(child: CircularProgressIndicator()),
+                if (!isLoading) FilledButton.tonal(
                   onPressed: () async {
                     final messenger = ScaffoldMessenger.of(context);
                     try {
                       final Uri url = Uri.parse('https://www.google.com/search?q=$word');
                       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-                        if (mounted) {
-                          messenger.showSnackBar(
-                            SnackBar(content: Text("Could not launch $url")),
-                          );
-                        }
+                        if (mounted) messenger.showSnackBar(SnackBar(content: Text("Could not launch $url")));
                       }
                     } catch (e) {
-                      if (mounted) {
-                        messenger.showSnackBar(
-                          SnackBar(content: Text("Error: $e")),
-                        );
-                      }
+                      if (mounted) messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
                       setState(() {});
                     }
                   },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.travel_explore_rounded, size: getFont(appState, AppFonts.body)),
+                      const SizedBox(width: 6),
+                      Text(appState.langMode == 0 ? 'Google Search' : 'Google 查询',
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
+                    ],
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
@@ -201,13 +206,22 @@ class _DetailPageState extends State<DetailPage> {
     Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        leading: BackButton(),
+        leading: const BackButton(),
+        title: Text(
+          word,
+          style: TextStyle(fontSize: getFont(appState, AppFonts.navTitle)),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           IconButton(
-            icon: Icon(appState.favoriteList.contains(wordData) ? Icons.bookmark : Icons.bookmark_border,),
-            onPressed: () {
-              appState.toggleFavList(wordData);
-            },
+            icon: Icon(
+              appState.favoriteList.contains(wordData) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+              color: appState.favoriteList.contains(wordData)
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
+            ),
+            onPressed: () => appState.toggleFavList(wordData),
           ),
         ],
       ),
@@ -300,45 +314,57 @@ class _DetailPageState extends State<DetailPage> {
               const Divider(),
               const SizedBox(height: 8),
 
-              Row(
-                // mainAxisSize: MainAxisSize.min,
+              Wrap(
+                spacing: 8,
                 children: [
-                  TextButton.icon(
-                    label: Text(_showMoreContent ? (appState.langMode == 0 ? "Hide AI answer" : "隐藏AI解释") : (_contentLoaded ? (appState.langMode == 0 ? "Show AI answer" : "展开AI解释") : (appState.langMode == 0 ? "Ask AI" : "AI解释")), style: TextStyle(fontSize: getFont(appState, AppFonts.body)),),
-                    icon: Icon(Icons.public),
-                    style: TextButton.styleFrom(foregroundColor: Colors.blueGrey,),
-                    onPressed: () => {toggleShowMore(word)},
+                  FilledButton.tonal(
+                    onPressed: () => toggleShowMore(word),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, size: getFont(appState, AppFonts.body)),
+                        const SizedBox(width: 6),
+                        Text(
+                          _showMoreContent
+                              ? (appState.langMode == 0 ? 'Hide AI' : '隐藏AI解释')
+                              : (_contentLoaded
+                                  ? (appState.langMode == 0 ? 'Show AI' : '展开AI解释')
+                                  : (appState.langMode == 0 ? 'Ask AI' : 'AI解释')),
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.body)),
+                        ),
+                      ],
+                    ),
                   ),
-                  // SizedBox(width: 24,),
-                  _showMoreContent ?
-                  SizedBox.shrink():
-                  Expanded(
-                    child: TextButton.icon(
-                      label: Text(appState.langMode == 0 ? "Google Search" : "Google 查询", style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
-                      icon: Icon(Icons.search),
-                      style: TextButton.styleFrom(foregroundColor: Colors.blueGrey,),
+                  if (!_showMoreContent)
+                    FilledButton.tonal(
                       onPressed: () async {
                         final messenger = ScaffoldMessenger.of(context);
                         try {
                           final Uri url = Uri.parse('https://www.google.com/search?q=$word');
                           if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                             if (mounted) {
-                              messenger.showSnackBar(
-                                SnackBar(content: Text("Could not launch $url")),
-                              );
+                              messenger.showSnackBar(SnackBar(content: Text("Could not launch $url")));
                             }
                           }
                         } catch (e) {
                           if (mounted) {
-                            messenger.showSnackBar(
-                              SnackBar(content: Text("Error: $e")),
-                            );
+                            messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
                           }
                           setState(() {});
                         }
                       },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.travel_explore_rounded, size: getFont(appState, AppFonts.body)),
+                          const SizedBox(width: 6),
+                          Text(
+                            appState.langMode == 0 ? 'Google' : 'Google 查询',
+                            style: TextStyle(fontSize: getFont(appState, AppFonts.body)),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
 
