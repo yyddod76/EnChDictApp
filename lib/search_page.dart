@@ -270,13 +270,18 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
 
-            if (!_isSearching && appState.todayVocabCards.isNotEmpty)
-              _VocabCardsSection(
-                cards: appState.todayVocabCards,
-                registration: appState.vocabRegistration,
-                appState: appState,
-              ),
-
+            // Vocab section: takes all remaining space when not searching
+            if (!_isSearching && appState.vocabRegistration != null)
+              Expanded(
+                child: appState.todayVocabCards.isEmpty
+                    ? _VocabDoneSection(registration: appState.vocabRegistration!, appState: appState)
+                    : _VocabCardsSection(
+                        cards: appState.todayVocabCards,
+                        registration: appState.vocabRegistration,
+                        appState: appState,
+                      ),
+              )
+            else ...[
             if (!appState.noAdsMode)
               !_isSearching ? SizedBox.shrink() :
                (_isAdLoaded && _bannerAd != null) ?
@@ -376,6 +381,57 @@ class _SearchPageState extends State<SearchPage> {
                 },
               ),
             ),
+            ], // end else branch
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VocabDoneSection extends StatelessWidget {
+  final VocabRegistration registration;
+  final MyAppState appState;
+  const _VocabDoneSection({required this.registration, required this.appState});
+
+  @override
+  Widget build(BuildContext context) {
+    final isEn = appState.langMode == 0;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.celebration_rounded, size: 72, color: colorScheme.primary),
+            const SizedBox(height: 20),
+            Text(
+              isEn ? 'All done for today!' : '今日任务完成！',
+              style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isEn
+                  ? "You've reviewed today's words from\n${registration.listNameEn}.\nCome back tomorrow for more!"
+                  : '「${registration.listNameZh}」今日单词已全部复习完成。\n明天再来继续学习吧！',
+              style: TextStyle(fontSize: getFont(appState, AppFonts.body), color: colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 36),
+            FilledButton.tonal(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const VocabPage()),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.list_alt_rounded, size: getFont(appState, AppFonts.body)),
+                const SizedBox(width: 6),
+                Text(isEn ? 'Manage List' : '管理单词表'),
+              ]),
+            ),
           ],
         ),
       ),
@@ -467,12 +523,6 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
     final colorScheme = Theme.of(context).colorScheme;
     final registration = widget.registration;
 
-    const double cardHeight = 130.0;
-    const double spacing = 8.0;
-    final int rows = (widget.cards.length / 2).ceil();
-    final double gridHeight = rows * cardHeight + (rows - 1) * spacing;
-    const double maxHeight = 290.0; // show ~2 rows, scroll if more
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -500,18 +550,15 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
             ],
           ),
         ),
-        SizedBox(
-          height: gridHeight.clamp(0.0, maxHeight),
+        Expanded(
           child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            physics: gridHeight <= maxHeight
-                ? const NeverScrollableScrollPhysics()
-                : const ClampingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            physics: const ClampingScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              mainAxisExtent: cardHeight,
+              mainAxisExtent: 130,
             ),
             itemCount: widget.cards.length,
             itemBuilder: (context, index) {
@@ -537,7 +584,6 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
             },
           ),
         ),
-        Divider(height: 1, color: colorScheme.outlineVariant),
       ],
     );
   }
@@ -606,12 +652,28 @@ class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProvi
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Row 1: word title (full width)
-              Text(
-                widget.word,
-                style: TextStyle(fontSize: getFont(appState, AppFonts.body), fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              // Row 1: word title — tap to open detail page
+              GestureDetector(
+                onTap: () {
+                  final data = DictDatabase.instance.lookupWord(widget.word);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => DetailPage(wordData: data ?? widget.word)),
+                  );
+                },
+                child: Text(
+                  widget.word,
+                  style: TextStyle(
+                    fontSize: getFont(appState, AppFonts.body),
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                    decorationStyle: TextDecorationStyle.dotted,
+                    decorationColor: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               // Phonetic (only when expanded)
               if (widget.isExpanded && phonetic.isNotEmpty) ...[
