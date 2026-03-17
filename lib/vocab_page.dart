@@ -15,6 +15,8 @@ class _VocabPageState extends State<VocabPage> {
   int _selectedMode = 0; // 0=sequential, 1=random
   List<VocabListInfo> _lists = [];
   VocabRegistration? _registration;
+  int _dailyCount = 15;
+  final TextEditingController _dailyCountController = TextEditingController();
   bool _loading = true;
 
   @override
@@ -31,11 +33,78 @@ class _VocabPageState extends State<VocabPage> {
       if (_registration != null) {
         _selectedList = _registration!.listKey;
         _selectedMode = _registration!.mode;
+        _dailyCount = _registration!.dailyCount.clamp(10, 100);
       } else if (_lists.isNotEmpty) {
         _selectedList = _lists.first.key;
       }
+      _dailyCount = _clampDailyCount(_dailyCount);
+      _dailyCountController.text = _dailyCount.toString();
       _loading = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _dailyCountController.dispose();
+    super.dispose();
+  }
+
+  int _listCountForKey(String? listKey) {
+    if (listKey == null) return 100;
+    final match = _lists.where((l) => l.key == listKey);
+    if (match.isEmpty) return 100;
+    return match.first.wordCount;
+  }
+
+  int _currentListCount() {
+    return _listCountForKey(_registration?.listKey ?? _selectedList);
+  }
+
+  int _minDailyCount() {
+    final count = _currentListCount();
+    if (count > 0 && count < 10) return count;
+    return 10;
+  }
+
+  int _maxDailyCount() {
+    final count = _currentListCount();
+    if (count <= 0) return 100;
+    final minVal = _minDailyCount();
+    return count.clamp(minVal, 100);
+  }
+
+  int _clampDailyCount(int value) {
+    final minVal = _minDailyCount();
+    final maxAllowed = _maxDailyCount();
+    return value.clamp(minVal, maxAllowed);
+  }
+
+  Future<void> _applyDailyCount(int value) async {
+    final int newCount = _clampDailyCount(value);
+    if (_dailyCount == newCount) return;
+    setState(() {
+      _dailyCount = newCount;
+      _dailyCountController.text = _dailyCount.toString();
+    });
+    if (_registration != null) {
+      final appStateRef = context.read<MyAppState>();
+      await DictDatabase.instance.updateVocabDailyCount(newCount);
+      appStateRef.refreshVocabCards();
+      if (mounted) {
+        setState(() {
+          _registration = DictDatabase.instance.getRegistration();
+        });
+      }
+    }
+  }
+
+  void _handleDailyInputSubmit(String val) {
+    final parsed = int.tryParse(val.trim());
+    if (parsed == null) {
+      _dailyCountController.text = _dailyCount.toString();
+      return;
+    }
+    _applyDailyCount(parsed);
   }
 
   @override
@@ -43,6 +112,9 @@ class _VocabPageState extends State<VocabPage> {
     final appState = context.watch<MyAppState>();
     final bool isEn = appState.langMode == 0;
     final colorScheme = Theme.of(context).colorScheme;
+    final int sliderMax = _maxDailyCount();
+    final int sliderMin = _minDailyCount();
+    final int maxCountForList = sliderMax;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,6 +147,10 @@ class _VocabPageState extends State<VocabPage> {
                             ? 'Mode: ${_registration!.mode == 0 ? "Sequential" : "Random"}'
                             : '模式: ${_registration!.mode == 0 ? "顺序" : "随机"}',
                             style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onPrimaryContainer)),
+                          Text(
+                            isEn ? 'Daily: ${_registration!.dailyCount} words' : '每日: ${_registration!.dailyCount} 词',
+                            style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onPrimaryContainer),
+                          ),
                           const SizedBox(height: 4),
                           _ProgressStats(listKey: _registration!.listKey, appState: appState, isEn: isEn),
                         ],
@@ -105,8 +181,71 @@ class _VocabPageState extends State<VocabPage> {
                             style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
                           subtitle: Text('${list.wordCount} ${isEn ? "words" : "词"}',
                             style: TextStyle(fontSize: getFont(appState, AppFonts.caption))),
-                          onChanged: (val) => setState(() => _selectedList = val),
+                          onChanged: (val) {
+                            setState(() => _selectedList = val);
+                            if (_registration == null) {
+                              _applyDailyCount(_dailyCount);
+                            }
+                          },
                         )),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Daily count selector
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(isEn ? 'Daily Word Count' : '每日单词数量',
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(isEn ? '$_dailyCount words per day' : '每日 $_dailyCount 个单词',
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurfaceVariant)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Slider(
+                                value: _dailyCount.clamp(sliderMin, sliderMax).toDouble(),
+                                min: sliderMin.toDouble(),
+                                max: sliderMax.toDouble(),
+                                divisions: (sliderMax - sliderMin) == 0 ? null : (sliderMax - sliderMin),
+                                label: '$_dailyCount',
+                                onChanged: (val) {
+                                  setState(() {
+                                    _dailyCount = val.round().clamp(sliderMin, maxCountForList);
+                                    _dailyCountController.text = _dailyCount.toString();
+                                  });
+                                },
+                                onChangeEnd: (val) => _applyDailyCount(val.round()),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: 80,
+                              child: TextField(
+                                controller: _dailyCountController,
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                  labelText: isEn ? 'Count' : '数量',
+                                  helperText: isEn ? 'Max $maxCountForList' : '最多 $maxCountForList',
+                                ),
+                                onSubmitted: _handleDailyInputSubmit,
+                                onEditingComplete: () => _handleDailyInputSubmit(_dailyCountController.text),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -163,7 +302,11 @@ class _VocabPageState extends State<VocabPage> {
                       final appStateRef = context.read<MyAppState>();
                       final messenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(context);
-                      await DictDatabase.instance.registerVocab(_selectedList!, _selectedMode);
+                      final int listCount = _listCountForKey(_selectedList);
+                      final int minVal = (listCount > 0 && listCount < 10) ? listCount : 10;
+                      final int maxAllowed = listCount > 0 ? listCount.clamp(minVal, 100) : 100;
+                      final int dailyCount = _dailyCount.clamp(minVal, maxAllowed);
+                      await DictDatabase.instance.registerVocab(_selectedList!, _selectedMode, dailyCount);
                       await VocabNotificationService.scheduleDailyReminder(appStateRef.langMode);
                       appStateRef.refreshVocabCards();
                       if (mounted) {

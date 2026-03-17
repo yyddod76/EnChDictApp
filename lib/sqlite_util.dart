@@ -214,6 +214,7 @@ class DictDatabase {
     _db.execute('''
       CREATE TABLE IF NOT EXISTS vocab_registration (
         list_key TEXT NOT NULL, mode INTEGER NOT NULL DEFAULT 0,
+        daily_count INTEGER NOT NULL DEFAULT 15,
         registered_at TEXT NOT NULL, current_position INTEGER NOT NULL DEFAULT 0
       )
     ''');
@@ -226,7 +227,16 @@ class DictDatabase {
         PRIMARY KEY (word, list_key)
       )
     ''');
+    _ensureVocabRegistrationSchema();
     await _loadVocabLists();
+  }
+
+  void _ensureVocabRegistrationSchema() {
+    final cols = _db.select('PRAGMA table_info(vocab_registration)');
+    final names = cols.map((row) => row['name'] as String).toSet();
+    if (!names.contains('daily_count')) {
+      _db.execute('ALTER TABLE vocab_registration ADD COLUMN daily_count INTEGER NOT NULL DEFAULT 15');
+    }
   }
 
   // [Fix #3] Added ChWordData handling so Chinese bookmarks are persisted.
@@ -398,19 +408,34 @@ class DictDatabase {
   }
 
   VocabRegistration? getRegistration() {
-    final rows = _db.select('SELECT r.list_key, r.mode, l.name_en, l.name_zh FROM vocab_registration r JOIN vocab_lists l ON l.key = r.list_key LIMIT 1');
+    final rows = _db.select('SELECT r.list_key, r.mode, r.daily_count, l.name_en, l.name_zh FROM vocab_registration r JOIN vocab_lists l ON l.key = r.list_key LIMIT 1');
     if (rows.isEmpty) return null;
     final row = rows.first;
-    return VocabRegistration(listKey: row['list_key'], mode: row['mode'], listNameEn: row['name_en'], listNameZh: row['name_zh']);
+    return VocabRegistration(
+      listKey: row['list_key'],
+      mode: row['mode'],
+      dailyCount: row['daily_count'] as int? ?? 15,
+      listNameEn: row['name_en'],
+      listNameZh: row['name_zh'],
+    );
   }
 
-  Future<void> registerVocab(String listKey, int mode) async {
+  Future<void> registerVocab(String listKey, int mode, int dailyCount) async {
+    final int clampedCount = dailyCount.clamp(10, 100);
     _db.execute('DELETE FROM vocab_registration');
-    _db.execute('INSERT INTO vocab_registration (list_key, mode, registered_at, current_position) VALUES (?, ?, date(\'now\'), 0)', [listKey, mode]);
+    _db.execute(
+      'INSERT INTO vocab_registration (list_key, mode, daily_count, registered_at, current_position) VALUES (?, ?, ?, date(\'now\'), 0)',
+      [listKey, mode, clampedCount],
+    );
   }
 
   Future<void> unregisterVocab() async {
     _db.execute('DELETE FROM vocab_registration');
+  }
+
+  Future<void> updateVocabDailyCount(int dailyCount) async {
+    final int clampedCount = dailyCount.clamp(10, 100);
+    _db.execute('UPDATE vocab_registration SET daily_count = ?', [clampedCount]);
   }
 
   List<String> getTodayVocabCards(int maxCount) {

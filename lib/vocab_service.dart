@@ -15,9 +15,16 @@ class VocabListInfo {
 class VocabRegistration {
   final String listKey;
   final int mode; // 0=sequential, 1=random
+  final int dailyCount; // words per day
   final String listNameEn;
   final String listNameZh;
-  VocabRegistration({required this.listKey, required this.mode, required this.listNameEn, required this.listNameZh});
+  VocabRegistration({
+    required this.listKey,
+    required this.mode,
+    required this.dailyCount,
+    required this.listNameEn,
+    required this.listNameZh,
+  });
 }
 
 // VocabCard model

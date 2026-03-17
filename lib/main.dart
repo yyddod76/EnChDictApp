@@ -318,7 +318,8 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
 
   void refreshVocabCards() {
     _vocabRegistration = db.getRegistration();
-    _todayVocabCards = db.getTodayVocabCards(15);
+    final int dailyCount = _vocabRegistration?.dailyCount ?? 15;
+    _todayVocabCards = db.getTodayVocabCards(dailyCount);
     notifyListeners();
   }
 

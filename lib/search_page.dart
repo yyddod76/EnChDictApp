@@ -475,11 +475,11 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
     final titles = isEn ? ['Tip 1 / 2', 'Tip 2 / 2'] : ['提示 1 / 2', '提示 2 / 2'];
     final hints = isEn
         ? [
-            'Tap the  ↺  (refresh) button on a card to reveal its definition.',
+            'Tap the View (eye) button on a card to reveal its definition.',
             'Tap the  ✓  (tick) button to confirm you recognise the word.\nThe card will fade away and be scheduled for future review.',
           ]
         : [
-            '点击卡片上的  ↺  按钮查看单词释义。',
+            '点击卡片上的“查看”按钮显示单词释义。',
             '点击  ✓  按钮确认已记住该单词。\n卡片将渐渐消失，并根据遗忘曲线安排复习。',
           ];
 
@@ -569,7 +569,7 @@ class _VocabCardsSectionState extends State<_VocabCardsSection> {
                 word: word,
                 isExpanded: isExpanded,
                 appState: appState,
-                onRefresh: () => setState(() {
+                onToggleView: () => setState(() {
                   if (isExpanded) {
                     _expandedCards.remove(word);
                   } else {
@@ -593,7 +593,7 @@ class _VocabFlashCard extends StatefulWidget {
   final String word;
   final bool isExpanded;
   final MyAppState appState;
-  final VoidCallback onRefresh;
+  final VoidCallback onToggleView;
   final VoidCallback onTick;
 
   const _VocabFlashCard({
@@ -601,7 +601,7 @@ class _VocabFlashCard extends StatefulWidget {
     required this.word,
     required this.isExpanded,
     required this.appState,
-    required this.onRefresh,
+    required this.onToggleView,
     required this.onTick,
   });
 
@@ -642,6 +642,10 @@ class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProvi
     final String translation = data?.translation.take(2).join('; ') ?? '';
     final String phonetic = data?.phonetic ?? '';
 
+    final double titleFontSize = widget.isExpanded
+        ? getFont(appState, AppFonts.body)
+        : getFont(appState, AppFonts.wordTitle);
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) => Opacity(opacity: _controller.value, child: child),
@@ -652,52 +656,85 @@ class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProvi
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Row 1: word title — tap to open detail page
-              GestureDetector(
-                onTap: () {
-                  final data = DictDatabase.instance.lookupWord(widget.word);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => DetailPage(wordData: data ?? widget.word)),
-                  );
-                },
-                child: Text(
-                  widget.word,
-                  style: TextStyle(
-                    fontSize: getFont(appState, AppFonts.body),
-                    fontWeight: FontWeight.bold,
-                    decoration: TextDecoration.underline,
-                    decorationStyle: TextDecorationStyle.dotted,
-                    decorationColor: Theme.of(context).colorScheme.primary,
-                    color: Theme.of(context).colorScheme.primary,
+              if (widget.isExpanded) ...[
+                // Word title — top-left when expanded
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: GestureDetector(
+                    onTap: () {
+                      final data = DictDatabase.instance.lookupWord(widget.word);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => DetailPage(wordData: data ?? widget.word)),
+                      );
+                    },
+                    child: Text(
+                      widget.word,
+                      style: TextStyle(
+                        fontSize: titleFontSize,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                        decorationStyle: TextDecorationStyle.dotted,
+                        decorationColor: Theme.of(context).colorScheme.primary,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              // Phonetic (only when expanded)
-              if (widget.isExpanded && phonetic.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  phonetic,
-                  style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.secondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                if (phonetic.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    phonetic,
+                    style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.secondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 4),
+                // Translation area — expands to fill remaining space, clips with ellipsis
+                Expanded(
+                  child: translation.isNotEmpty
+                      ? Text(
+                          translation,
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurface),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ] else ...[
+                // Word title — centered when collapsed
+                Expanded(
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        final data = DictDatabase.instance.lookupWord(widget.word);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => DetailPage(wordData: data ?? widget.word)),
+                        );
+                      },
+                      child: Text(
+                        widget.word,
+                        style: TextStyle(
+                          fontSize: titleFontSize,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                          decorationStyle: TextDecorationStyle.dotted,
+                          decorationColor: Theme.of(context).colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
                 ),
               ],
-              const SizedBox(height: 4),
-              // Translation area — expands to fill remaining space, clips with ellipsis
-              Expanded(
-                child: widget.isExpanded && translation.isNotEmpty
-                    ? Text(
-                        translation,
-                        style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurface),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              // Bottom row: refresh (left) and tick (right)
+              // Bottom row: view (left) and tick (right)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -705,11 +742,11 @@ class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProvi
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     icon: Icon(
-                      widget.isExpanded ? Icons.visibility_off_rounded : Icons.refresh_rounded,
+                      widget.isExpanded ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                       size: getFont(appState, AppFonts.navTitle),
                       color: colorScheme.primary,
                     ),
-                    onPressed: widget.onRefresh,
+                    onPressed: widget.onToggleView,
                   ),
                   IconButton(
                     padding: EdgeInsets.zero,
