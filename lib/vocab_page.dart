@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'main.dart';
@@ -16,7 +18,6 @@ class _VocabPageState extends State<VocabPage> {
   List<VocabListInfo> _lists = [];
   VocabRegistration? _registration;
   int _dailyCount = 15;
-  final TextEditingController _dailyCountController = TextEditingController();
   bool _loading = true;
 
   @override
@@ -33,26 +34,209 @@ class _VocabPageState extends State<VocabPage> {
       if (_registration != null) {
         _selectedList = _registration!.listKey;
         _selectedMode = _registration!.mode;
-        _dailyCount = _registration!.dailyCount.clamp(10, 100);
+        _dailyCount = _registration!.dailyCount.clamp(10, 300);
       } else if (_lists.isNotEmpty) {
         _selectedList = _lists.first.key;
       }
       _dailyCount = _clampDailyCount(_dailyCount);
-      _dailyCountController.text = _dailyCount.toString();
       _loading = false;
     });
   }
 
-  @override
-  void dispose() {
-    _dailyCountController.dispose();
-    super.dispose();
+  void _reloadLists({String? selectedKey}) {
+    final db = DictDatabase.instance;
+    setState(() {
+      _lists = db.getVocabLists();
+      _registration = db.getRegistration();
+      if (selectedKey != null) {
+        _selectedList = selectedKey;
+      } else if (_selectedList == null && _lists.isNotEmpty) {
+        _selectedList = _lists.first.key;
+      }
+      _dailyCount = _clampDailyCount(_dailyCount);
+    });
+  }
+
+  String _stripExtension(String name) {
+    final idx = name.lastIndexOf('.');
+    if (idx <= 0) return name;
+    return name.substring(0, idx);
+  }
+
+  List<String> _parseWordsFromText(String content) {
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) return [];
+    if (trimmed.startsWith('[')) {
+      try {
+        final decoded = json.decode(trimmed);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList();
+        }
+      } catch (_) {
+        return [];
+      }
+    }
+    return trimmed
+        .split(RegExp(r'[\r\n,]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  List<String> _extractFavoriteWords(List<dynamic> favorites) {
+    final List<String> words = [];
+    for (final item in favorites) {
+      if (item is EnWordData) {
+        words.add(item.word);
+      } else if (item is ChWordData) {
+        words.add(item.simplified);
+      } else {
+        words.add(item.toString());
+      }
+    }
+    return words;
+  }
+
+  List<String> _extractHistoryWords(Map<String, List<String>> histories) {
+    const orderedKeys = ['today', 'this week', 'this month', 'this year', 'older'];
+    final List<String> words = [];
+    for (final key in orderedKeys) {
+      final items = histories[key];
+      if (items != null && items.isNotEmpty) {
+        words.addAll(items);
+      }
+    }
+    for (final entry in histories.entries) {
+      if (orderedKeys.contains(entry.key)) continue;
+      if (entry.value.isNotEmpty) {
+        words.addAll(entry.value);
+      }
+    }
+    return words;
+  }
+
+  Future<String?> _promptForListName(String initialName, MyAppState appState) async {
+    final controller = TextEditingController(text: initialName);
+    final isEn = appState.langMode == 0;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEn ? 'Name Your List' : '命名单词表'),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: isEn ? 'Vocabulary list name' : '单词表名称',
+          ),
+          textInputAction: TextInputAction.done,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(isEn ? 'Cancel' : '取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              Navigator.of(ctx).pop(name.isEmpty ? null : name);
+            },
+            child: Text(isEn ? 'Save' : '保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createListFromWords({
+    required String defaultName,
+    required List<String> words,
+  }) async {
+    final appState = context.read<MyAppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    final isEn = appState.langMode == 0;
+
+    if (words.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(isEn ? 'No words found to create a list.' : '没有可用于创建单词表的单词。')),
+      );
+      return;
+    }
+
+    final name = await _promptForListName(defaultName, appState);
+    if (!mounted) return;
+    if (name == null || name.trim().isEmpty) return;
+
+    final listKey = await DictDatabase.instance.addCustomVocabList(
+      nameEn: name,
+      nameZh: name,
+      words: words,
+    );
+
+    if (!mounted) return;
+    if (listKey == null) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(isEn ? 'No valid words found in this list.' : '该列表没有有效单词。')),
+      );
+      return;
+    }
+
+    _reloadLists(selectedKey: listKey);
+    messenger.showSnackBar(
+      SnackBar(content: Text(isEn ? 'Vocabulary list added.' : '单词表已添加。')),
+    );
+  }
+
+  Future<void> _importFromFile() async {
+    final appState = context.read<MyAppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    final isEn = appState.langMode == 0;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['txt', 'json', 'csv'],
+      withData: true,
+    );
+    if (result == null) return;
+
+    final file = result.files.single;
+    if (file.bytes == null) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(isEn ? 'Unable to read this file.' : '无法读取该文件。')),
+      );
+      return;
+    }
+
+    final content = utf8.decode(file.bytes!, allowMalformed: true);
+    final words = _parseWordsFromText(content);
+    if (words.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(isEn ? 'No valid words found in the file.' : '文件中没有有效单词。')),
+      );
+      return;
+    }
+
+    final baseName = _stripExtension(file.name);
+    final defaultName = baseName.isNotEmpty
+        ? baseName
+        : (isEn ? 'Custom List' : '自定义单词表');
+    await _createListFromWords(defaultName: defaultName, words: words);
+  }
+
+  Future<void> _createFromFavorites(MyAppState appState) async {
+    final words = _extractFavoriteWords(appState.favoriteList);
+    final defaultName = appState.langMode == 0 ? 'Favorites' : '收藏';
+    await _createListFromWords(defaultName: defaultName, words: words);
+  }
+
+  Future<void> _createFromHistory(MyAppState appState) async {
+    final words = _extractHistoryWords(appState.historyList);
+    final defaultName = appState.langMode == 0 ? 'History' : '历史记录';
+    await _createListFromWords(defaultName: defaultName, words: words);
   }
 
   int _listCountForKey(String? listKey) {
-    if (listKey == null) return 100;
+    if (listKey == null) return 300;
     final match = _lists.where((l) => l.key == listKey);
-    if (match.isEmpty) return 100;
+    if (match.isEmpty) return 300;
     return match.first.wordCount;
   }
 
@@ -68,9 +252,9 @@ class _VocabPageState extends State<VocabPage> {
 
   int _maxDailyCount() {
     final count = _currentListCount();
-    if (count <= 0) return 100;
+    if (count <= 0) return 300;
     final minVal = _minDailyCount();
-    return count.clamp(minVal, 100);
+    return count.clamp(minVal, 300);
   }
 
   int _clampDailyCount(int value) {
@@ -84,7 +268,6 @@ class _VocabPageState extends State<VocabPage> {
     if (_dailyCount == newCount) return;
     setState(() {
       _dailyCount = newCount;
-      _dailyCountController.text = _dailyCount.toString();
     });
     if (_registration != null) {
       final appStateRef = context.read<MyAppState>();
@@ -98,15 +281,6 @@ class _VocabPageState extends State<VocabPage> {
     }
   }
 
-  void _handleDailyInputSubmit(String val) {
-    final parsed = int.tryParse(val.trim());
-    if (parsed == null) {
-      _dailyCountController.text = _dailyCount.toString();
-      return;
-    }
-    _applyDailyCount(parsed);
-  }
-
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<MyAppState>();
@@ -115,6 +289,8 @@ class _VocabPageState extends State<VocabPage> {
     final int sliderMax = _maxDailyCount();
     final int sliderMin = _minDailyCount();
     final int maxCountForList = sliderMax;
+    final int favoritesCount = appState.favoriteList.length;
+    final int historyCount = appState.historyList.values.fold(0, (sum, list) => sum + list.length);
 
     return Scaffold(
       appBar: AppBar(
@@ -159,6 +335,54 @@ class _VocabPageState extends State<VocabPage> {
                   ),
                   const SizedBox(height: 16),
                 ],
+
+                // Custom list builder
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isEn ? 'Add Custom List' : '添加自定义单词表',
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          isEn
+                              ? 'Import a text file (JSON array or CSV list), or build from Favorites/History.'
+                              : '导入文本文件（JSON 数组或 CSV 列表），或从收藏/历史记录生成。',
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: _importFromFile,
+                              icon: const Icon(Icons.upload_file_rounded),
+                              label: Text(isEn ? 'Import File' : '导入文件'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: favoritesCount == 0 ? null : () => _createFromFavorites(appState),
+                              icon: const Icon(Icons.bookmark_rounded),
+                              label: Text(isEn ? 'From Favorites ($favoritesCount)' : '来自收藏 ($favoritesCount)'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: historyCount == 0 ? null : () => _createFromHistory(appState),
+                              icon: const Icon(Icons.history_rounded),
+                              label: Text(isEn ? 'From History ($historyCount)' : '来自历史 ($historyCount)'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 // List selector
                 Card(
@@ -209,42 +433,18 @@ class _VocabPageState extends State<VocabPage> {
                         Text(isEn ? '$_dailyCount words per day' : '每日 $_dailyCount 个单词',
                           style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurfaceVariant)),
                         const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Slider(
-                                value: _dailyCount.clamp(sliderMin, sliderMax).toDouble(),
-                                min: sliderMin.toDouble(),
-                                max: sliderMax.toDouble(),
-                                divisions: (sliderMax - sliderMin) == 0 ? null : (sliderMax - sliderMin),
-                                label: '$_dailyCount',
-                                onChanged: (val) {
-                                  setState(() {
-                                    _dailyCount = val.round().clamp(sliderMin, maxCountForList);
-                                    _dailyCountController.text = _dailyCount.toString();
-                                  });
-                                },
-                                onChangeEnd: (val) => _applyDailyCount(val.round()),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            SizedBox(
-                              width: 80,
-                              child: TextField(
-                                controller: _dailyCountController,
-                                keyboardType: TextInputType.number,
-                                textAlign: TextAlign.center,
-                                decoration: InputDecoration(
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                                  labelText: isEn ? 'Count' : '数量',
-                                  helperText: isEn ? 'Max $maxCountForList' : '最多 $maxCountForList',
-                                ),
-                                onSubmitted: _handleDailyInputSubmit,
-                                onEditingComplete: () => _handleDailyInputSubmit(_dailyCountController.text),
-                              ),
-                            ),
-                          ],
+                        Slider(
+                          value: _dailyCount.clamp(sliderMin, sliderMax).toDouble(),
+                          min: sliderMin.toDouble(),
+                          max: sliderMax.toDouble(),
+                          divisions: (sliderMax - sliderMin) == 0 ? null : (sliderMax - sliderMin),
+                          label: '$_dailyCount',
+                          onChanged: (val) {
+                            setState(() {
+                              _dailyCount = val.round().clamp(sliderMin, maxCountForList);
+                            });
+                          },
+                          onChangeEnd: (val) => _applyDailyCount(val.round()),
                         ),
                       ],
                     ),
@@ -304,7 +504,7 @@ class _VocabPageState extends State<VocabPage> {
                       final navigator = Navigator.of(context);
                       final int listCount = _listCountForKey(_selectedList);
                       final int minVal = (listCount > 0 && listCount < 10) ? listCount : 10;
-                      final int maxAllowed = listCount > 0 ? listCount.clamp(minVal, 100) : 100;
+    final int maxAllowed = listCount > 0 ? listCount.clamp(minVal, 300) : 300;
                       final int dailyCount = _dailyCount.clamp(minVal, maxAllowed);
                       await DictDatabase.instance.registerVocab(_selectedList!, _selectedMode, dailyCount);
                       await VocabNotificationService.scheduleDailyReminder(appStateRef.langMode);

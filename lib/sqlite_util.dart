@@ -29,6 +29,26 @@ List<String> _getStrList(String? name, Row row) {
   return strList;
 }
 
+String _slugifyListKey(String input) {
+  final base = input.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+  final trimmed = base.replaceAll(RegExp(r'^_+|_+$'), '');
+  return trimmed.isEmpty ? 'custom' : trimmed;
+}
+
+List<String> _sanitizeWords(Iterable<String> words) {
+  final List<String> cleaned = [];
+  final Set<String> seen = {};
+  for (final raw in words) {
+    final word = raw.trim();
+    if (word.isEmpty) continue;
+    final key = word.toLowerCase();
+    if (seen.contains(key)) continue;
+    seen.add(key);
+    cleaned.add(word);
+  }
+  return cleaned;
+}
+
 class EnWordData {
   final int id;
   final String word;
@@ -105,8 +125,8 @@ class ChWordData {
 }
 
 class DictDatabase {
-  static final DictDatabase _instance = DictDatabase._init();
-  static DictDatabase get instance => _instance;
+  static DictDatabase? _instance;
+  static DictDatabase get instance => _instance ??= DictDatabase._init();
 
   late final Database _db;
   final Map<String, PreparedStatement> _searchEnStmts = {};
@@ -407,6 +427,34 @@ class DictDatabase {
       .toList();
   }
 
+  Future<String?> addCustomVocabList({
+    required String nameEn,
+    required String nameZh,
+    required List<String> words,
+  }) async {
+    final cleaned = _sanitizeWords(words);
+    if (cleaned.isEmpty) return null;
+
+    final baseKey = _slugifyListKey(nameEn.isNotEmpty ? nameEn : nameZh);
+    String listKey = baseKey;
+    int suffix = 1;
+    while (_db.select('SELECT key FROM vocab_lists WHERE key = ?', [listKey]).isNotEmpty) {
+      suffix += 1;
+      listKey = '${baseKey}_$suffix';
+    }
+
+    _db.execute(
+      'INSERT INTO vocab_lists (key, name_en, name_zh) VALUES (?, ?, ?)',
+      [listKey, nameEn, nameZh],
+    );
+    final stmt = _db.prepare('INSERT INTO vocab_words (list_key, word, position) VALUES (?, ?, ?)');
+    for (int i = 0; i < cleaned.length; i++) {
+      stmt.execute([listKey, cleaned[i], i]);
+    }
+    stmt.dispose();
+    return listKey;
+  }
+
   VocabRegistration? getRegistration() {
     final rows = _db.select('SELECT r.list_key, r.mode, r.daily_count, l.name_en, l.name_zh FROM vocab_registration r JOIN vocab_lists l ON l.key = r.list_key LIMIT 1');
     if (rows.isEmpty) return null;
@@ -421,7 +469,7 @@ class DictDatabase {
   }
 
   Future<void> registerVocab(String listKey, int mode, int dailyCount) async {
-    final int clampedCount = dailyCount.clamp(10, 100);
+    final int clampedCount = dailyCount.clamp(10, 300);
     _db.execute('DELETE FROM vocab_registration');
     _db.execute(
       'INSERT INTO vocab_registration (list_key, mode, daily_count, registered_at, current_position) VALUES (?, ?, ?, date(\'now\'), 0)',
@@ -434,7 +482,7 @@ class DictDatabase {
   }
 
   Future<void> updateVocabDailyCount(int dailyCount) async {
-    final int clampedCount = dailyCount.clamp(10, 100);
+    final int clampedCount = dailyCount.clamp(10, 300);
     _db.execute('UPDATE vocab_registration SET daily_count = ?', [clampedCount]);
   }
 
