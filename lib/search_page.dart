@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -91,7 +92,12 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _loadBannerAd() async {
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
     final bannerUnitId = dotenv.env['GOOGLE_AD_BANNER_UNIT_ID'];
+    if (bannerUnitId == null || bannerUnitId.isEmpty) return;
     _bannerAd = BannerAd(
       adUnitId: bannerUnitId!,
       size: AdSize.banner,
@@ -611,6 +617,7 @@ class _VocabFlashCard extends StatefulWidget {
 
 class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  bool _showPhonetic = false;
 
   @override
   void initState() {
@@ -634,13 +641,21 @@ class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProvi
     });
   }
 
+  void _handlePronounce() {
+    setState(() => _showPhonetic = !_showPhonetic);
+    final lang = widget.appState.langMode == 0 ? 'en-US' : 'zh-CN';
+    widget.appState.trySpeak(lang, widget.word);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final appState = widget.appState;
-    final EnWordData? data = widget.isExpanded ? DictDatabase.instance.lookupWord(widget.word) : null;
+    final bool needsData = widget.isExpanded || _showPhonetic;
+    final EnWordData? data = needsData ? DictDatabase.instance.lookupWord(widget.word) : null;
     final String translation = data?.translation.take(2).join('; ') ?? '';
-    final String phonetic = data?.phonetic ?? '';
+    final String phonetic = (data?.phonetic ?? '').trim();
+    final bool showPhonetic = _showPhonetic && phonetic.isNotEmpty;
 
     final double titleFontSize = widget.isExpanded
         ? getFont(appState, AppFonts.body)
@@ -683,7 +698,7 @@ class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProvi
                     ),
                   ),
                 ),
-                if (phonetic.isNotEmpty) ...[
+                if (showPhonetic) ...[
                   const SizedBox(height: 2),
                   Text(
                     phonetic,
@@ -708,55 +723,94 @@ class _VocabFlashCardState extends State<_VocabFlashCard> with SingleTickerProvi
                 // Word title — centered when collapsed
                 Expanded(
                   child: Center(
-                    child: GestureDetector(
-                      onTap: () {
-                        final data = DictDatabase.instance.lookupWord(widget.word);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => DetailPage(wordData: data ?? widget.word)),
-                        );
-                      },
-                      child: Text(
-                        widget.word,
-                        style: TextStyle(
-                          fontSize: titleFontSize,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.underline,
-                          decorationStyle: TextDecorationStyle.dotted,
-                          decorationColor: Theme.of(context).colorScheme.primary,
-                          color: Theme.of(context).colorScheme.primary,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            final data = DictDatabase.instance.lookupWord(widget.word);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => DetailPage(wordData: data ?? widget.word)),
+                            );
+                          },
+                          child: Text(
+                            widget.word,
+                            style: TextStyle(
+                              fontSize: titleFontSize,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                              decorationStyle: TextDecorationStyle.dotted,
+                              decorationColor: Theme.of(context).colorScheme.primary,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
+                        if (showPhonetic) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            phonetic,
+                            style: TextStyle(fontSize: getFont(appState, AppFonts.tiny), color: colorScheme.secondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
               ],
               // Bottom row: view (left) and tick (right)
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: Icon(
-                      widget.isExpanded ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                      size: getFont(appState, AppFonts.navTitle),
-                      color: colorScheme.primary,
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          widget.isExpanded ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                          size: getFont(appState, AppFonts.navTitle),
+                          color: colorScheme.primary,
+                        ),
+                        onPressed: widget.onToggleView,
+                      ),
                     ),
-                    onPressed: widget.onToggleView,
                   ),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: Icon(
-                      Icons.check_circle_rounded,
-                      size: getFont(appState, AppFonts.navTitle),
-                      color: colorScheme.tertiary,
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          _showPhonetic ? Icons.volume_up_rounded : Icons.volume_up_outlined,
+                          size: getFont(appState, AppFonts.navTitle),
+                          color: colorScheme.secondary,
+                        ),
+                        onPressed: _handlePronounce,
+                      ),
                     ),
-                    onPressed: _handleTick,
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          Icons.check_circle_rounded,
+                          size: getFont(appState, AppFonts.navTitle),
+                          color: colorScheme.tertiary,
+                        ),
+                        onPressed: _handleTick,
+                      ),
+                    ),
                   ),
                 ],
               ),
