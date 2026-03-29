@@ -139,6 +139,19 @@ class _SearchPageState extends State<SearchPage> {
     final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
     var appState = context.watch<MyAppState>();
     var favorites = appState.favoriteList;
+    final completedList = appState.completedVocabList;
+
+    if (completedList != null && isCurrent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final info = appState.consumeCompletedVocabList();
+        if (info == null) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => VocabCongratsPage(info: info)),
+        );
+      });
+    }
 
     // [Fix #5] React to external searchWord without calling setState inside build.
     // addPostFrameCallback defers the setState to after the current frame.
@@ -389,6 +402,104 @@ class _SearchPageState extends State<SearchPage> {
             ),
             ], // end else branch
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class VocabCongratsPage extends StatelessWidget {
+  final VocabCompletionInfo info;
+  const VocabCongratsPage({super.key, required this.info});
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<MyAppState>();
+    final isEn = appState.langMode == 0;
+    final colorScheme = Theme.of(context).colorScheme;
+    final headline = isEn ? 'Congratulations!' : '恭喜完成！';
+    final subhead = isEn
+        ? 'You finished the entire list.'
+        : '你已完成整个单词表。';
+    final listName = isEn ? info.listNameEn : info.listNameZh;
+    final countText = isEn
+        ? '${info.totalWords} words mastered'
+        : '已掌握 ${info.totalWords} 词';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEn ? 'Big Congrats' : '学习完成'),
+      ),
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.primaryContainer.withValues(alpha: 0.9),
+              colorScheme.secondaryContainer.withValues(alpha: 0.9),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.emoji_events_rounded, size: 96, color: colorScheme.onPrimaryContainer),
+                  const SizedBox(height: 16),
+                  Text(
+                    headline,
+                    style: TextStyle(
+                      fontSize: getFont(appState, AppFonts.sectionHeader) + 8,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    subhead,
+                    style: TextStyle(fontSize: getFont(appState, AppFonts.body), color: colorScheme.onPrimaryContainer),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    listName,
+                    style: TextStyle(
+                      fontSize: getFont(appState, AppFonts.sectionHeader),
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    countText,
+                    style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onPrimaryContainer),
+                  ),
+                  const SizedBox(height: 28),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(isEn ? 'Back to Search' : '返回搜索'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const VocabPage()),
+                      );
+                    },
+                    child: Text(isEn ? 'Manage Lists' : '管理单词表'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

@@ -400,6 +400,8 @@ class DictDatabase {
     'xiaoxue':  ['Elementary School', '小学'],
   };
 
+  bool isBuiltInVocabList(String listKey) => _vocabMeta.containsKey(listKey);
+
   Future<void> _loadVocabLists() async {
     for (final entry in _vocabMeta.entries) {
       final key = entry.key;
@@ -423,7 +425,16 @@ class DictDatabase {
 
   List<VocabListInfo> getVocabLists() {
     return _db.select('SELECT v.key, v.name_en, v.name_zh, COUNT(w.id) as cnt FROM vocab_lists v LEFT JOIN vocab_words w ON w.list_key = v.key GROUP BY v.key')
-      .map((row) => VocabListInfo(key: row['key'], nameEn: row['name_en'], nameZh: row['name_zh'], wordCount: row['cnt'] as int))
+      .map((row) {
+        final key = row['key'] as String;
+        return VocabListInfo(
+          key: key,
+          nameEn: row['name_en'],
+          nameZh: row['name_zh'],
+          wordCount: row['cnt'] as int,
+          isCustom: !isBuiltInVocabList(key),
+        );
+      })
       .toList();
   }
 
@@ -453,6 +464,15 @@ class DictDatabase {
     }
     stmt.dispose();
     return listKey;
+  }
+
+  Future<bool> deleteCustomVocabList(String listKey) async {
+    if (isBuiltInVocabList(listKey)) return false;
+    _db.execute('DELETE FROM vocab_progress WHERE list_key = ?', [listKey]);
+    _db.execute('DELETE FROM vocab_words WHERE list_key = ?', [listKey]);
+    _db.execute('DELETE FROM vocab_registration WHERE list_key = ?', [listKey]);
+    _db.execute('DELETE FROM vocab_lists WHERE key = ?', [listKey]);
+    return true;
   }
 
   VocabRegistration? getRegistration() {

@@ -8,7 +8,14 @@ class VocabListInfo {
   final String nameEn;
   final String nameZh;
   final int wordCount;
-  VocabListInfo({required this.key, required this.nameEn, required this.nameZh, required this.wordCount});
+  final bool isCustom;
+  VocabListInfo({
+    required this.key,
+    required this.nameEn,
+    required this.nameZh,
+    required this.wordCount,
+    required this.isCustom,
+  });
 }
 
 // VocabRegistration model
@@ -24,6 +31,19 @@ class VocabRegistration {
     required this.dailyCount,
     required this.listNameEn,
     required this.listNameZh,
+  });
+}
+
+class VocabCompletionInfo {
+  final String listKey;
+  final String listNameEn;
+  final String listNameZh;
+  final int totalWords;
+  VocabCompletionInfo({
+    required this.listKey,
+    required this.listNameEn,
+    required this.listNameZh,
+    required this.totalWords,
   });
 }
 

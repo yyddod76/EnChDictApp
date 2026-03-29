@@ -19,6 +19,7 @@ class _VocabPageState extends State<VocabPage> {
   VocabRegistration? _registration;
   int _dailyCount = 15;
   bool _loading = true;
+  bool _showCustomList = true;
 
   @override
   void initState() {
@@ -50,6 +51,9 @@ class _VocabPageState extends State<VocabPage> {
       _registration = db.getRegistration();
       if (selectedKey != null) {
         _selectedList = selectedKey;
+      }
+      if (_selectedList != null && !_lists.any((l) => l.key == _selectedList)) {
+        _selectedList = _lists.isNotEmpty ? _lists.first.key : null;
       } else if (_selectedList == null && _lists.isNotEmpty) {
         _selectedList = _lists.first.key;
       }
@@ -233,6 +237,35 @@ class _VocabPageState extends State<VocabPage> {
     await _createListFromWords(defaultName: defaultName, words: words);
   }
 
+  Future<void> _deleteCustomList(VocabListInfo list) async {
+    final appState = context.read<MyAppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    final isEn = appState.langMode == 0;
+    final confirmed = await showDeleteConfirmationDialog(
+      context,
+      isEn ? 'Delete list' : '删除单词表',
+      isEn
+          ? 'This will remove the list and its progress data.'
+          : '将删除此单词表及其学习进度。',
+      appState,
+    );
+    if (!confirmed) return;
+
+    final wasRegistered = _registration?.listKey == list.key;
+    final deleted = await DictDatabase.instance.deleteCustomVocabList(list.key);
+    if (!deleted) return;
+    if (wasRegistered) {
+      await VocabNotificationService.cancelReminder();
+      appState.refreshVocabCards();
+    }
+    _reloadLists();
+    if (mounted) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(isEn ? 'List deleted.' : '单词表已删除。')),
+      );
+    }
+  }
+
   int _listCountForKey(String? listKey) {
     if (listKey == null) return 300;
     final match = _lists.where((l) => l.key == listKey);
@@ -344,39 +377,52 @@ class _VocabPageState extends State<VocabPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          isEn ? 'Add Custom List' : '添加自定义单词表',
-                          style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          isEn
-                              ? 'Import a text file (JSON array or CSV list), or build from Favorites/History.'
-                              : '导入文本文件（JSON 数组或 CSV 列表），或从收藏/历史记录生成。',
-                          style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                        Row(
                           children: [
-                            FilledButton.icon(
-                              onPressed: _importFromFile,
-                              icon: const Icon(Icons.upload_file_rounded),
-                              label: Text(isEn ? 'Import File' : '导入文件'),
+                            Expanded(
+                              child: Text(
+                                isEn ? 'Add Custom List' : '添加自定义单词表',
+                                style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            OutlinedButton.icon(
-                              onPressed: favoritesCount == 0 ? null : () => _createFromFavorites(appState),
-                              icon: const Icon(Icons.bookmark_rounded),
-                              label: Text(isEn ? 'From Favorites ($favoritesCount)' : '来自收藏 ($favoritesCount)'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: historyCount == 0 ? null : () => _createFromHistory(appState),
-                              icon: const Icon(Icons.history_rounded),
-                              label: Text(isEn ? 'From History ($historyCount)' : '来自历史 ($historyCount)'),
+                            TextButton.icon(
+                              onPressed: () => setState(() => _showCustomList = !_showCustomList),
+                              icon: Icon(_showCustomList ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                              label: Text(_showCustomList ? (isEn ? 'Hide' : '收起') : (isEn ? 'Show' : '展开')),
                             ),
                           ],
                         ),
+                        if (_showCustomList) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            isEn
+                                ? 'Import a text file (JSON array or CSV list), or build from Favorites/History.'
+                                : '导入文本文件（JSON 数组或 CSV 列表），或从收藏/历史记录生成。',
+                            style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: _importFromFile,
+                                icon: const Icon(Icons.upload_file_rounded),
+                                label: Text(isEn ? 'Import File' : '导入文件'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: favoritesCount == 0 ? null : () => _createFromFavorites(appState),
+                                icon: const Icon(Icons.bookmark_rounded),
+                                label: Text(isEn ? 'From Favorites ($favoritesCount)' : '来自收藏 ($favoritesCount)'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: historyCount == 0 ? null : () => _createFromHistory(appState),
+                                icon: const Icon(Icons.history_rounded),
+                                label: Text(isEn ? 'From History ($historyCount)' : '来自历史 ($historyCount)'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -405,6 +451,13 @@ class _VocabPageState extends State<VocabPage> {
                             style: TextStyle(fontSize: getFont(appState, AppFonts.body))),
                           subtitle: Text('${list.wordCount} ${isEn ? "words" : "词"}',
                             style: TextStyle(fontSize: getFont(appState, AppFonts.caption))),
+                          secondary: list.isCustom
+                              ? IconButton(
+                                  tooltip: isEn ? 'Delete list' : '删除单词表',
+                                  icon: const Icon(Icons.delete_outline_rounded),
+                                  onPressed: () => _deleteCustomList(list),
+                                )
+                              : null,
                           onChanged: (val) {
                             setState(() => _selectedList = val);
                             if (_registration == null) {
@@ -504,7 +557,7 @@ class _VocabPageState extends State<VocabPage> {
                       final navigator = Navigator.of(context);
                       final int listCount = _listCountForKey(_selectedList);
                       final int minVal = (listCount > 0 && listCount < 10) ? listCount : 10;
-    final int maxAllowed = listCount > 0 ? listCount.clamp(minVal, 300) : 300;
+                      final int maxAllowed = listCount > 0 ? listCount.clamp(minVal, 300) : 300;
                       final int dailyCount = _dailyCount.clamp(minVal, maxAllowed);
                       await DictDatabase.instance.registerVocab(_selectedList!, _selectedMode, dailyCount);
                       await VocabNotificationService.scheduleDailyReminder(appStateRef.langMode);

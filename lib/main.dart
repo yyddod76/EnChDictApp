@@ -176,6 +176,8 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
   List<String> get todayVocabCards => _todayVocabCards;
   VocabRegistration? _vocabRegistration;
   VocabRegistration? get vocabRegistration => _vocabRegistration;
+  VocabCompletionInfo? _completedVocabList;
+  VocabCompletionInfo? get completedVocabList => _completedVocabList;
 
   //no Ads mode flag
   bool _noAdsMode = false;
@@ -325,9 +327,30 @@ class MyAppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> markVocabCardKnown(String word) async {
     if (_vocabRegistration == null) return;
-    await db.markVocabWordKnown(word, _vocabRegistration!.listKey);
+    final reg = _vocabRegistration!;
+    await db.markVocabWordKnown(word, reg.listKey);
     _todayVocabCards.remove(word);
+    final total = db.getVocabTotalWords(reg.listKey);
+    final learned = db.getVocabLearnedCount(reg.listKey);
+    if (total > 0 && learned >= total) {
+      await db.unregisterVocab();
+      await VocabNotificationService.cancelReminder();
+      _vocabRegistration = null;
+      _todayVocabCards = [];
+      _completedVocabList = VocabCompletionInfo(
+        listKey: reg.listKey,
+        listNameEn: reg.listNameEn,
+        listNameZh: reg.listNameZh,
+        totalWords: total,
+      );
+    }
     notifyListeners();
+  }
+
+  VocabCompletionInfo? consumeCompletedVocabList() {
+    final info = _completedVocabList;
+    _completedVocabList = null;
+    return info;
   }
 
   Future<void> trySpeak(String lang, String content) async {
