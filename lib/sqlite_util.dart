@@ -392,11 +392,11 @@ class DictDatabase {
   }
 
   static const Map<String, List<String>> _vocabMeta = {
-    'cet4':     ['College English Test Band 4 (CET-4)', '大学英语4级'],
-    'cet6':     ['College English Test Band 6 (CET-6)', '大学英语6级'],
-    'chuzhong': ['Middle School', '初中'],
-    'gaozhong': ['High School', '高中'],
     'kaoyan':   ['Postgraduate Entrance', '研究生'],
+    'cet6':     ['College English Test Band 6 (CET-6)', '大学英语6级'],
+    'cet4':     ['College English Test Band 4 (CET-4)', '大学英语4级'],
+    'gaozhong': ['High School', '高中'],
+    'chuzhong': ['Middle School', '初中'],
     'xiaoxue':  ['Elementary School', '小学'],
   };
 
@@ -462,7 +462,7 @@ class DictDatabase {
     return VocabRegistration(
       listKey: row['list_key'],
       mode: row['mode'],
-      dailyCount: row['daily_count'] as int? ?? 15,
+      dailyCount: row['daily_count'] as int? ?? 10,
       listNameEn: row['name_en'],
       listNameZh: row['name_zh'],
     );
