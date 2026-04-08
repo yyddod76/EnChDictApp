@@ -19,7 +19,6 @@ class _VocabPageState extends State<VocabPage> {
   VocabRegistration? _registration;
   int _dailyCount = 15;
   bool _loading = true;
-  bool _showCustomList = true;
 
   @override
   void initState() {
@@ -369,67 +368,6 @@ class _VocabPageState extends State<VocabPage> {
                   const SizedBox(height: 16),
                 ],
 
-                // Custom list builder
-                Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                isEn ? 'Add Custom List' : '添加自定义单词表',
-                                style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: () => setState(() => _showCustomList = !_showCustomList),
-                              icon: Icon(_showCustomList ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-                              label: Text(_showCustomList ? (isEn ? 'Hide' : '收起') : (isEn ? 'Show' : '展开')),
-                            ),
-                          ],
-                        ),
-                        if (_showCustomList) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            isEn
-                                ? 'Import a text file (JSON array or CSV list), or build from Favorites/History.'
-                                : '导入文本文件（JSON 数组或 CSV 列表），或从收藏/历史记录生成。',
-                            style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurfaceVariant),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              FilledButton.icon(
-                                onPressed: _importFromFile,
-                                icon: const Icon(Icons.upload_file_rounded),
-                                label: Text(isEn ? 'Import File' : '导入文件'),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: favoritesCount == 0 ? null : () => _createFromFavorites(appState),
-                                icon: const Icon(Icons.bookmark_rounded),
-                                label: Text(isEn ? 'From Favorites ($favoritesCount)' : '来自收藏 ($favoritesCount)'),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: historyCount == 0 ? null : () => _createFromHistory(appState),
-                                icon: const Icon(Icons.history_rounded),
-                                label: Text(isEn ? 'From History ($historyCount)' : '来自历史 ($historyCount)'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
                 // List selector
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -465,6 +403,43 @@ class _VocabPageState extends State<VocabPage> {
                             }
                           },
                         )),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        Text(isEn ? 'Add Custom List' : '添加自定义单词表',
+                          style: TextStyle(fontSize: getFont(appState, AppFonts.sectionHeader), fontWeight: FontWeight.bold)),
+
+                        ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            isEn
+                                ? 'Import a text file (JSON array or CSV list), or build from Favorites/History.'
+                                : '导入文本文件（JSON 数组或 CSV 列表），或从收藏/历史记录生成。',
+                            style: TextStyle(fontSize: getFont(appState, AppFonts.caption), color: colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: _importFromFile,
+                                icon: const Icon(Icons.upload_file_rounded),
+                                label: Text(isEn ? 'Import File' : '导入文件'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: favoritesCount == 0 ? null : () => _createFromFavorites(appState),
+                                icon: const Icon(Icons.bookmark_rounded),
+                                label: Text(isEn ? 'From Favorites ($favoritesCount)' : '来自收藏 ($favoritesCount)'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: historyCount == 0 ? null : () => _createFromHistory(appState),
+                                icon: const Icon(Icons.history_rounded),
+                                label: Text(isEn ? 'From History ($historyCount)' : '来自历史 ($historyCount)'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

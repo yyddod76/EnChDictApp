@@ -428,7 +428,7 @@ class VocabCongratsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEn ? 'Big Congrats' : '学习完成'),
+        title: Text(isEn ? 'List Complete' : '学习完成'),
       ),
       body: Container(
         width: double.infinity,
